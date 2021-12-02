@@ -3,6 +3,7 @@ package pyroscope
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/pprof"
 	"time"
 
@@ -35,6 +36,12 @@ func Start(cfg Config) (*Profiler, error) {
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = noopLogger
+	}
+
+	// Override the address to use when the environment variable is defined.
+	// This is useful to support adhoc push ingestion.
+	if address, ok := os.LookupEnv("PYROSCOPE_ADHOC_SERVER_ADDRESS"); ok {
+		cfg.ServerAddress = address
 	}
 
 	rc := session.RemoteConfig{
