@@ -49,6 +49,7 @@ type Upstream interface {
 var (
 	ErrCloudTokenRequired = errors.New("Please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
 	ErrUpload             = errors.New("Failed to upload a profile")
+	ErrUpgradeServer      = errors.New("Newer version of pyroscope server required (>= v0.3.1). Visit https://pyroscope.io/docs/golang/ for more information")
 	cloudHostnameSuffix   = "pyroscope.cloud"
 )
 
@@ -191,6 +192,9 @@ func (r *Remote) uploadProfile(j *UploadJob) error {
 		return fmt.Errorf("read response body: %v", err)
 	}
 
+	if response.StatusCode == 422 {
+		return ErrUpgradeServer
+	}
 	if response.StatusCode != 200 {
 		return ErrUpload
 	}
