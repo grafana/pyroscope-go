@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pyroscope-io/client/internal/flameql"
-	"github.com/pyroscope-io/client/internal/types"
+	"github.com/pyroscope-io/client/types"
 )
 
 const errorThrottlerPeriod = 10 * time.Second

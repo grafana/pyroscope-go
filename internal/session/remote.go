@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pyroscope-io/client/internal/types"
+	"github.com/pyroscope-io/client/types"
 )
 
 type UploadFormat string

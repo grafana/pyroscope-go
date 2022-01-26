@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pyroscope-io/client/internal/session"
-	"github.com/pyroscope-io/client/internal/types"
+	"github.com/pyroscope-io/client/types"
 )
 
 type Config struct {
