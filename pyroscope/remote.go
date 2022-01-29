@@ -1,4 +1,4 @@
-package session
+package pyroscope
 
 import (
 	"bytes"
@@ -14,21 +14,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/pyroscope-io/client/internal/types"
 )
 
-type UploadFormat string
-type Payload interface {
-	Bytes() []byte
-}
+type uploadFormat string
 
-const (
-	Pprof UploadFormat = "pprof"
-	Trie               = "trie"
-)
+const pprofFormat uploadFormat = "pprof"
 
-type UploadJob struct {
+type uploadJob struct {
 	Name            string
 	StartTime       time.Time
 	EndTime         time.Time
@@ -36,82 +28,73 @@ type UploadJob struct {
 	SampleRate      uint32
 	Units           string
 	AggregationType string
-	Format          UploadFormat
+	Format          uploadFormat
 	Profile         []byte
 	PrevProfile     []byte
 }
 
-type Upstream interface {
-	Stop()
-	Upload(u *UploadJob)
-}
-
 var (
-	ErrCloudTokenRequired = errors.New("Please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
-	ErrUpload             = errors.New("Failed to upload a profile")
-	ErrUpgradeServer      = errors.New("Newer version of pyroscope server required (>= v0.3.1). Visit https://pyroscope.io/docs/golang/ for more information")
-	cloudHostnameSuffix   = "pyroscope.cloud"
+	errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
+	errUpload             = errors.New("failed to upload a profile")
+	errUpgradeServer      = errors.New("newer version of pyroscope server required (>= v0.3.1). Visit https://pyroscope.io/docs/golang/ for more information")
 )
 
-type Remote struct {
-	cfg    RemoteConfig
-	jobs   chan *UploadJob
+const cloudHostnameSuffix = "pyroscope.cloud"
+
+type remote struct {
+	cfg    remoteConfig
+	jobs   chan *uploadJob
 	client *http.Client
-	Logger types.Logger
+	Logger Logger
 
 	done chan struct{}
 	wg   sync.WaitGroup
 }
 
-type RemoteConfig struct {
-	AuthToken              string
-	UpstreamThreads        int
-	UpstreamAddress        string
-	UpstreamRequestTimeout time.Duration
-
-	ManualStart bool
+type remoteConfig struct {
+	authToken string
+	threads   int
+	address   string
+	timeout   time.Duration
 }
 
-func NewRemote(cfg RemoteConfig, logger types.Logger) (*Remote, error) {
-	remote := &Remote{
+func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
+	r := &remote{
 		cfg:  cfg,
-		jobs: make(chan *UploadJob, 20),
+		jobs: make(chan *uploadJob, 20),
 		client: &http.Client{
 			Transport: &http.Transport{
-				MaxConnsPerHost: cfg.UpstreamThreads,
+				MaxConnsPerHost: cfg.threads,
 			},
-			Timeout: cfg.UpstreamRequestTimeout,
+			Timeout: cfg.timeout,
 		},
 		Logger: logger,
 		done:   make(chan struct{}),
 	}
 
 	// parse the upstream address
-	u, err := url.Parse(cfg.UpstreamAddress)
+	u, err := url.Parse(cfg.address)
 	if err != nil {
 		return nil, err
 	}
 
 	// authorize the token first
-	if cfg.AuthToken == "" && requiresAuthToken(u) {
-		return nil, ErrCloudTokenRequired
+	if cfg.authToken == "" && requiresAuthToken(u) {
+		return nil, errCloudTokenRequired
 	}
 
-	if !cfg.ManualStart {
-		// start goroutines for uploading profile data
-		remote.Start()
-	}
-
-	return remote, nil
+	// start goroutines for uploading profile data
+	r.Start()
+	return r, nil
 }
 
-func (r *Remote) Start() {
-	for i := 0; i < r.cfg.UpstreamThreads; i++ {
+func (r *remote) Start() {
+	for i := 0; i < r.cfg.threads; i++ {
 		go r.handleJobs()
 	}
 }
 
-func (r *Remote) Stop() {
+func (r *remote) Stop() {
 	if r.done != nil {
 		close(r.done)
 	}
@@ -120,7 +103,7 @@ func (r *Remote) Stop() {
 	r.wg.Wait()
 }
 
-func (r *Remote) Upload(job *UploadJob) {
+func (r *remote) upload(job *uploadJob) {
 	select {
 	case r.jobs <- job:
 	default:
@@ -128,8 +111,8 @@ func (r *Remote) Upload(job *UploadJob) {
 	}
 }
 
-func (r *Remote) uploadProfile(j *UploadJob) error {
-	u, err := url.Parse(r.cfg.UpstreamAddress)
+func (r *remote) uploadProfile(j *uploadJob) error {
+	u, err := url.Parse(r.cfg.address)
 	if err != nil {
 		return fmt.Errorf("url parse: %v", err)
 	}
@@ -175,8 +158,8 @@ func (r *Remote) uploadProfile(j *UploadJob) error {
 	request.Header.Set("Content-Type", contentType)
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
-	if r.cfg.AuthToken != "" {
-		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
+	if r.cfg.authToken != "" {
+		request.Header.Set("Authorization", "Bearer "+r.cfg.authToken)
 	}
 
 	// do the request and get the response
@@ -193,17 +176,17 @@ func (r *Remote) uploadProfile(j *UploadJob) error {
 	}
 
 	if response.StatusCode == 422 {
-		return ErrUpgradeServer
+		return errUpgradeServer
 	}
 	if response.StatusCode != 200 {
-		return ErrUpload
+		return errUpload
 	}
 
 	return nil
 }
 
 // handle the jobs
-func (r *Remote) handleJobs() {
+func (r *remote) handleJobs() {
 	for {
 		select {
 		case <-r.done:
@@ -219,7 +202,7 @@ func requiresAuthToken(u *url.URL) bool {
 }
 
 // do safe upload
-func (r *Remote) safeUpload(job *UploadJob) {
+func (r *remote) safeUpload(job *uploadJob) {
 	defer func() {
 		if catch := recover(); catch != nil {
 			r.Logger.Errorf("recover stack: %v", debug.Stack())

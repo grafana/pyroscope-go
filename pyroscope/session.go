@@ -1,29 +1,25 @@
-package session
+package pyroscope
 
 import (
 	"bytes"
-	"encoding/binary"
 	"runtime"
 	"runtime/pprof"
 	"sync"
 	"time"
 
 	"github.com/pyroscope-io/client/internal/flameql"
-	"github.com/pyroscope-io/client/internal/types"
 )
 
-const errorThrottlerPeriod = 10 * time.Second
-
-type Session struct {
+type session struct {
 	// configuration, doesn't change
-	upstream      Upstream
+	upstream      *remote
 	sampleRate    uint32
-	profileTypes  []types.ProfileType
+	profileTypes  []ProfileType
 	uploadRate    time.Duration
 	disableGCRuns bool
 	pid           int
 
-	logger    types.Logger
+	logger    Logger
 	stopOnce  sync.Once
 	stopCh    chan struct{}
 	trieMutex sync.Mutex
@@ -38,76 +34,37 @@ type Session struct {
 	startTime        time.Time
 }
 
-type SessionConfig struct {
-	Upstream
-	types.Logger
-	AppName        string
-	Tags           map[string]string
-	ProfilingTypes []types.ProfileType
-	DisableGCRuns  bool
-	SampleRate     uint32
-	UploadRate     time.Duration
+type sessionConfig struct {
+	upstream       *remote
+	logger         Logger
+	appName        string
+	tags           map[string]string
+	profilingTypes []ProfileType
+	disableGCRuns  bool
+	sampleRate     uint32
+	uploadRate     time.Duration
 }
 
-// implements upstream.Payload
-type Single []byte
-
-func (s Single) Bytes() []byte {
-	return s
-}
-
-// TODO: I don't think append is very efficient
-func (s Single) BytesWithLength() []byte {
-	lenBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(lenBytes, uint64(len(s)))
-	return append(lenBytes, s...)
-}
-
-// implements upstream.Payload
-type Double struct {
-	prev    Single
-	current Single
-}
-
-// TODO: I don't think append is very efficient
-func (d Double) Bytes() []byte {
-	return append(d.prev.BytesWithLength(), d.current.BytesWithLength()...)
-}
-
-// TODO: horrible API, change this
-type SetAppNamer interface {
-	SetAppName(string)
-}
-
-func NewSession(c SessionConfig) (*Session, error) {
-	appName, err := mergeTagsWithAppName(c.AppName, c.Tags)
+func newSession(c sessionConfig) (*session, error) {
+	appName, err := mergeTagsWithAppName(c.appName, c.tags)
 	if err != nil {
 		return nil, err
 	}
 
-	ps := &Session{
-		upstream:      c.Upstream,
+	ps := &session{
+		upstream:      c.upstream,
 		appName:       appName,
-		profileTypes:  c.ProfilingTypes,
-		disableGCRuns: c.DisableGCRuns,
-		sampleRate:    c.SampleRate,
-		uploadRate:    c.UploadRate,
+		profileTypes:  c.profilingTypes,
+		disableGCRuns: c.disableGCRuns,
+		sampleRate:    c.sampleRate,
+		uploadRate:    c.uploadRate,
 		stopCh:        make(chan struct{}),
-		logger:        c.Logger,
+		logger:        c.logger,
 		cpuBuf:        &bytes.Buffer{},
 		memBuf:        &bytes.Buffer{},
 	}
 
 	return ps, nil
-}
-
-func addSuffix(name string, ptype types.ProfileType) (string, error) {
-	k, err := flameql.ParseKey(name)
-	if err != nil {
-		return "", err
-	}
-	k.Add("__name__", k.AppName()+"."+string(ptype))
-	return k.Normalized(), nil
 }
 
 // mergeTagsWithAppName validates user input and merges explicitly specified
@@ -138,7 +95,7 @@ func mergeTagsWithAppName(appName string, tags map[string]string) (string, error
 }
 
 // revive:disable-next-line:cognitive-complexity complexity is fine
-func (ps *Session) takeSnapshots() {
+func (ps *session) takeSnapshots() {
 	ticker := time.NewTicker(time.Second / time.Duration(ps.sampleRate))
 	defer ticker.Stop()
 	for {
@@ -159,14 +116,14 @@ func copyBuf(b []byte) []byte {
 	return r
 }
 
-func (ps *Session) Start() error {
+func (ps *session) Start() error {
 	ps.reset()
 
 	go ps.takeSnapshots()
 	return nil
 }
 
-func (ps *Session) isDueForReset() bool {
+func (ps *session) isDueForReset() bool {
 	// TODO: duration should be either taken from config or ideally passed from server
 	now := time.Now().Truncate(ps.uploadRate)
 	start := ps.startTime.Truncate(ps.uploadRate)
@@ -174,25 +131,25 @@ func (ps *Session) isDueForReset() bool {
 	return !start.Equal(now)
 }
 
-func (ps *Session) isCPUEnabled() bool {
+func (ps *session) isCPUEnabled() bool {
 	for _, t := range ps.profileTypes {
-		if t == types.ProfileCPU {
+		if t == ProfileCPU {
 			return true
 		}
 	}
 	return false
 }
 
-func (ps *Session) isMemEnabled() bool {
+func (ps *session) isMemEnabled() bool {
 	for _, t := range ps.profileTypes {
-		if t == types.ProfileInuseObjects || t == types.ProfileAllocObjects || t == types.ProfileInuseSpace || t == types.ProfileAllocSpace {
+		if t == ProfileInuseObjects || t == ProfileAllocObjects || t == ProfileInuseSpace || t == ProfileAllocSpace {
 			return true
 		}
 	}
 	return false
 }
 
-func (ps *Session) reset() {
+func (ps *session) reset() {
 	now := time.Now()
 	endTime := now.Truncate(ps.uploadRate)
 	startTime := endTime.Add(-ps.uploadRate)
@@ -207,7 +164,7 @@ func (ps *Session) reset() {
 			defer func() {
 				pprof.StartCPUProfile(ps.cpuBuf)
 			}()
-			ps.upstream.Upload(&UploadJob{
+			ps.upstream.upload(&uploadJob{
 				Name:            ps.appName,
 				StartTime:       startTime,
 				EndTime:         endTime,
@@ -215,7 +172,7 @@ func (ps *Session) reset() {
 				SampleRate:      100,
 				Units:           "samples",
 				AggregationType: "sum",
-				Format:          Pprof,
+				Format:          pprofFormat,
 				Profile:         copyBuf(ps.cpuBuf.Bytes()),
 			})
 			ps.cpuBuf.Reset()
@@ -235,13 +192,13 @@ func (ps *Session) reset() {
 				curMemBytes := copyBuf(ps.memBuf.Bytes())
 				ps.memBuf.Reset()
 				if ps.memPrevBytes != nil {
-					ps.upstream.Upload(&UploadJob{
+					ps.upstream.upload(&uploadJob{
 						Name:        ps.appName,
 						StartTime:   startTime,
 						EndTime:     endTime,
 						SpyName:     "gospy",
 						SampleRate:  100,
-						Format:      Pprof,
+						Format:      pprofFormat,
 						Profile:     curMemBytes,
 						PrevProfile: ps.memPrevBytes,
 					})
@@ -253,7 +210,7 @@ func (ps *Session) reset() {
 	}
 }
 
-func (ps *Session) Stop() {
+func (ps *session) stop() {
 	ps.trieMutex.Lock()
 	defer ps.trieMutex.Unlock()
 
@@ -265,7 +222,7 @@ func (ps *Session) Stop() {
 	})
 }
 
-func (ps *Session) uploadData(now time.Time) {
+func (ps *session) uploadData(now time.Time) {
 
 }
 
