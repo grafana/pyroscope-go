@@ -89,6 +89,7 @@ func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
 }
 
 func (r *remote) Start() {
+	r.wg.Add(r.cfg.threads)
 	for i := 0; i < r.cfg.threads; i++ {
 		go r.handleJobs()
 	}
@@ -190,6 +191,7 @@ func (r *remote) handleJobs() {
 	for {
 		select {
 		case <-r.done:
+			r.wg.Done()
 			return
 		case job := <-r.jobs:
 			r.safeUpload(job)

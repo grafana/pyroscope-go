@@ -218,12 +218,25 @@ func (ps *session) stop() {
 		// TODO: wait for stopCh consumer to finish!
 		close(ps.stopCh)
 		// before stopping, upload the tries
-		ps.uploadData(time.Now())
+		ps.uploadLastBitOfData(time.Now())
 	})
 }
 
-func (ps *session) uploadData(now time.Time) {
-
+func (ps *session) uploadLastBitOfData(now time.Time) {
+	if ps.isCPUEnabled() {
+		pprof.StopCPUProfile()
+		ps.upstream.upload(&uploadJob{
+			Name:            ps.appName,
+			StartTime:       ps.startTime,
+			EndTime:         now,
+			SpyName:         "gospy",
+			SampleRate:      100,
+			Units:           "samples",
+			AggregationType: "sum",
+			Format:          pprofFormat,
+			Profile:         copyBuf(ps.cpuBuf.Bytes()),
+		})
+	}
 }
 
 func numGC() uint32 {

@@ -20,7 +20,8 @@ type Config struct {
 }
 
 type Profiler struct {
-	session *session
+	session  *session
+	uploader *remote
 }
 
 // Start starts continuously profiling go code
@@ -78,12 +79,13 @@ func Start(cfg Config) (*Profiler, error) {
 		return nil, fmt.Errorf("start session: %w", err)
 	}
 
-	return &Profiler{session: s}, nil
+	return &Profiler{session: s, uploader: uploader}, nil
 }
 
-// Stop stops continious profiling session
+// Stop stops continious profiling session and uploads the remaining profiling data
 func (p *Profiler) Stop() error {
 	p.session.stop()
+	p.uploader.Stop()
 	return nil
 }
 
