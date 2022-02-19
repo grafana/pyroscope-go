@@ -155,57 +155,61 @@ func (ps *session) reset() {
 	startTime := endTime.Add(-ps.uploadRate)
 	ps.logger.Debugf("profiling session reset %s", startTime.String())
 
-	ps.startTime = endTime
-
 	// first reset should not result in an upload
 	if !ps.startTime.IsZero() {
-		if ps.isCPUEnabled() {
-			pprof.StopCPUProfile()
-			defer func() {
-				pprof.StartCPUProfile(ps.cpuBuf)
-			}()
-			ps.upstream.upload(&uploadJob{
-				Name:            ps.appName,
-				StartTime:       startTime,
-				EndTime:         endTime,
-				SpyName:         "gospy",
-				SampleRate:      100,
-				Units:           "samples",
-				AggregationType: "sum",
-				Format:          pprofFormat,
-				Profile:         copyBuf(ps.cpuBuf.Bytes()),
-			})
-			ps.cpuBuf.Reset()
-		}
+		ps.uploadData(startTime, endTime)
+	}
 
-		if ps.isMemEnabled() {
-			currentGCGeneration := numGC()
-			// sometimes GC doesn't run within 10 seconds
-			//   in such cases we force a GC run
-			//   users can disable it with disableGCRuns option
-			if currentGCGeneration == ps.lastGCGeneration && !ps.disableGCRuns {
-				runtime.GC()
-				currentGCGeneration = numGC()
+	ps.startTime = endTime
+}
+
+func (ps *session) uploadData(startTime, endTime time.Time) {
+	if ps.isCPUEnabled() {
+		pprof.StopCPUProfile()
+		defer func() {
+			pprof.StartCPUProfile(ps.cpuBuf)
+		}()
+		ps.upstream.upload(&uploadJob{
+			Name:            ps.appName,
+			StartTime:       startTime,
+			EndTime:         endTime,
+			SpyName:         "gospy",
+			SampleRate:      100,
+			Units:           "samples",
+			AggregationType: "sum",
+			Format:          pprofFormat,
+			Profile:         copyBuf(ps.cpuBuf.Bytes()),
+		})
+		ps.cpuBuf.Reset()
+	}
+
+	if ps.isMemEnabled() {
+		currentGCGeneration := numGC()
+		// sometimes GC doesn't run within 10 seconds
+		//   in such cases we force a GC run
+		//   users can disable it with disableGCRuns option
+		if currentGCGeneration == ps.lastGCGeneration && !ps.disableGCRuns {
+			runtime.GC()
+			currentGCGeneration = numGC()
+		}
+		if currentGCGeneration != ps.lastGCGeneration {
+			pprof.WriteHeapProfile(ps.memBuf)
+			curMemBytes := copyBuf(ps.memBuf.Bytes())
+			ps.memBuf.Reset()
+			if ps.memPrevBytes != nil {
+				ps.upstream.upload(&uploadJob{
+					Name:        ps.appName,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					SpyName:     "gospy",
+					SampleRate:  100,
+					Format:      pprofFormat,
+					Profile:     curMemBytes,
+					PrevProfile: ps.memPrevBytes,
+				})
 			}
-			if currentGCGeneration != ps.lastGCGeneration {
-				pprof.WriteHeapProfile(ps.memBuf)
-				curMemBytes := copyBuf(ps.memBuf.Bytes())
-				ps.memBuf.Reset()
-				if ps.memPrevBytes != nil {
-					ps.upstream.upload(&uploadJob{
-						Name:        ps.appName,
-						StartTime:   startTime,
-						EndTime:     endTime,
-						SpyName:     "gospy",
-						SampleRate:  100,
-						Format:      pprofFormat,
-						Profile:     curMemBytes,
-						PrevProfile: ps.memPrevBytes,
-					})
-				}
-				ps.memPrevBytes = curMemBytes
-				ps.lastGCGeneration = currentGCGeneration
-			}
+			ps.memPrevBytes = curMemBytes
+			ps.lastGCGeneration = currentGCGeneration
 		}
 	}
 }
