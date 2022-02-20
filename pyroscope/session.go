@@ -158,6 +158,8 @@ func (ps *session) reset() {
 	// first reset should not result in an upload
 	if !ps.startTime.IsZero() {
 		ps.uploadData(startTime, endTime)
+	} else {
+		pprof.StartCPUProfile(ps.cpuBuf)
 	}
 
 	ps.startTime = endTime
