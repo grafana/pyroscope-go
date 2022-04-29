@@ -64,6 +64,14 @@ func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
 			Transport: &http.Transport{
 				MaxConnsPerHost: cfg.threads,
 			},
+			// Don't follow redirects
+			// Since the go http client strips the Authorization header when doing redirects (eg http -> https)
+			// https://github.com/golang/go/blob/a41763539c7ad09a22720a517a28e6018ca4db0f/src/net/http/client_test.go#L1764
+			// that makes the an authorized return a 401
+			// which is confusing since the user most likely already set up an API Key
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 			Timeout: cfg.timeout,
 		},
 		Logger: logger,
