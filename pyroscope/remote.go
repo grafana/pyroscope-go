@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -177,7 +177,7 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 	defer response.Body.Close()
 
 	// read all the response body
-	respBody, err := io.ReadAll(response.Body)
+	respBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("read response body: %v", err)
 	}
