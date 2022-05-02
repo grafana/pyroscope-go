@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -35,8 +35,6 @@ type uploadJob struct {
 
 var (
 	errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
-	errUpload             = errors.New("failed to upload a profile")
-	errUpgradeServer      = errors.New("newer version of pyroscope server required (>= v0.3.1). Visit https://pyroscope.io/docs/golang/ for more information")
 )
 
 const cloudHostnameSuffix = "pyroscope.cloud"
@@ -65,6 +63,14 @@ func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxConnsPerHost: cfg.threads,
+			},
+			// Don't follow redirects
+			// Since the go http client strips the Authorization header when doing redirects (eg http -> https)
+			// https://github.com/golang/go/blob/a41763539c7ad09a22720a517a28e6018ca4db0f/src/net/http/client_test.go#L1764
+			// that makes the an authorized return a 401
+			// which is confusing since the user most likely already set up an API Key
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
 			},
 			Timeout: cfg.timeout,
 		},
@@ -171,16 +177,13 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 	defer response.Body.Close()
 
 	// read all the response body
-	_, err = ioutil.ReadAll(response.Body)
+	respBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("read response body: %v", err)
 	}
 
-	if response.StatusCode == 422 {
-		return errUpgradeServer
-	}
 	if response.StatusCode != 200 {
-		return errUpload
+		return fmt.Errorf("failed to upload. server responded with statusCode: '%d' and body: '%s'", response.StatusCode, string(respBody))
 	}
 
 	return nil
