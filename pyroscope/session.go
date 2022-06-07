@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/pyroscope-io/client/internal/flameql"
+	"github.com/pyroscope-io/client/upstream"
 )
 
-type session struct {
+type Session struct {
 	// configuration, doesn't change
-	upstream      *remote
+	upstream      upstream.Upstream
 	sampleRate    uint32
 	profileTypes  []ProfileType
 	uploadRate    time.Duration
@@ -34,32 +35,32 @@ type session struct {
 	startTime        time.Time
 }
 
-type sessionConfig struct {
-	upstream       *remote
-	logger         Logger
-	appName        string
-	tags           map[string]string
-	profilingTypes []ProfileType
-	disableGCRuns  bool
-	sampleRate     uint32
-	uploadRate     time.Duration
+type SessionConfig struct {
+	Upstream       upstream.Upstream
+	Logger         Logger
+	AppName        string
+	Tags           map[string]string
+	ProfilingTypes []ProfileType
+	DisableGCRuns  bool
+	SampleRate     uint32
+	UploadRate     time.Duration
 }
 
-func newSession(c sessionConfig) (*session, error) {
-	appName, err := mergeTagsWithAppName(c.appName, c.tags)
+func NewSession(c SessionConfig) (*Session, error) {
+	appName, err := mergeTagsWithAppName(c.AppName, c.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	ps := &session{
-		upstream:      c.upstream,
+	ps := &Session{
+		upstream:      c.Upstream,
 		appName:       appName,
-		profileTypes:  c.profilingTypes,
-		disableGCRuns: c.disableGCRuns,
-		sampleRate:    c.sampleRate,
-		uploadRate:    c.uploadRate,
+		profileTypes:  c.ProfilingTypes,
+		disableGCRuns: c.DisableGCRuns,
+		sampleRate:    c.SampleRate,
+		uploadRate:    c.UploadRate,
 		stopCh:        make(chan struct{}),
-		logger:        c.logger,
+		logger:        c.Logger,
 		cpuBuf:        &bytes.Buffer{},
 		memBuf:        &bytes.Buffer{},
 	}
@@ -95,7 +96,7 @@ func mergeTagsWithAppName(appName string, tags map[string]string) (string, error
 }
 
 // revive:disable-next-line:cognitive-complexity complexity is fine
-func (ps *session) takeSnapshots() {
+func (ps *Session) takeSnapshots() {
 	ticker := time.NewTicker(time.Second / time.Duration(ps.sampleRate))
 	defer ticker.Stop()
 	for {
@@ -116,14 +117,14 @@ func copyBuf(b []byte) []byte {
 	return r
 }
 
-func (ps *session) Start() error {
+func (ps *Session) Start() error {
 	ps.reset()
 
 	go ps.takeSnapshots()
 	return nil
 }
 
-func (ps *session) isDueForReset() bool {
+func (ps *Session) isDueForReset() bool {
 	// TODO: duration should be either taken from config or ideally passed from server
 	now := time.Now().Truncate(ps.uploadRate)
 	start := ps.startTime.Truncate(ps.uploadRate)
@@ -131,7 +132,7 @@ func (ps *session) isDueForReset() bool {
 	return !start.Equal(now)
 }
 
-func (ps *session) isCPUEnabled() bool {
+func (ps *Session) isCPUEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileCPU {
 			return true
@@ -140,7 +141,7 @@ func (ps *session) isCPUEnabled() bool {
 	return false
 }
 
-func (ps *session) isMemEnabled() bool {
+func (ps *Session) isMemEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileInuseObjects || t == ProfileAllocObjects || t == ProfileInuseSpace || t == ProfileAllocSpace {
 			return true
@@ -149,7 +150,7 @@ func (ps *session) isMemEnabled() bool {
 	return false
 }
 
-func (ps *session) reset() {
+func (ps *Session) reset() {
 	now := time.Now()
 	endTime := now.Truncate(ps.uploadRate)
 	startTime := endTime.Add(-ps.uploadRate)
@@ -165,13 +166,13 @@ func (ps *session) reset() {
 	ps.startTime = endTime
 }
 
-func (ps *session) uploadData(startTime, endTime time.Time) {
+func (ps *Session) uploadData(startTime, endTime time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
 		defer func() {
 			pprof.StartCPUProfile(ps.cpuBuf)
 		}()
-		ps.upstream.upload(&uploadJob{
+		ps.upstream.Upload(&upstream.UploadJob{
 			Name:            ps.appName,
 			StartTime:       startTime,
 			EndTime:         endTime,
@@ -179,7 +180,7 @@ func (ps *session) uploadData(startTime, endTime time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          pprofFormat,
+			Format:          upstream.FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 		ps.cpuBuf.Reset()
@@ -199,13 +200,13 @@ func (ps *session) uploadData(startTime, endTime time.Time) {
 			curMemBytes := copyBuf(ps.memBuf.Bytes())
 			ps.memBuf.Reset()
 			if ps.memPrevBytes != nil {
-				ps.upstream.upload(&uploadJob{
+				ps.upstream.Upload(&upstream.UploadJob{
 					Name:        ps.appName,
 					StartTime:   startTime,
 					EndTime:     endTime,
 					SpyName:     "gospy",
 					SampleRate:  100,
-					Format:      pprofFormat,
+					Format:      upstream.FormatPprof,
 					Profile:     curMemBytes,
 					PrevProfile: ps.memPrevBytes,
 				})
@@ -216,7 +217,7 @@ func (ps *session) uploadData(startTime, endTime time.Time) {
 	}
 }
 
-func (ps *session) stop() {
+func (ps *Session) Stop() {
 	ps.trieMutex.Lock()
 	defer ps.trieMutex.Unlock()
 
@@ -228,10 +229,10 @@ func (ps *session) stop() {
 	})
 }
 
-func (ps *session) uploadLastBitOfData(now time.Time) {
+func (ps *Session) uploadLastBitOfData(now time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
-		ps.upstream.upload(&uploadJob{
+		ps.upstream.Upload(&upstream.UploadJob{
 			Name:            ps.appName,
 			StartTime:       ps.startTime,
 			EndTime:         now,
@@ -239,7 +240,7 @@ func (ps *session) uploadLastBitOfData(now time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          pprofFormat,
+			Format:          upstream.FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 	}
