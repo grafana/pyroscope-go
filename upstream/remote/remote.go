@@ -2,6 +2,7 @@ package remote
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -128,6 +129,17 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 		if err != nil {
 			return err
 		}
+	}
+	if j.SampleTypeConfig != nil {
+		fw, err = writer.CreateFormFile("sample_type_config", "sample_type_config.json")
+		if err != nil {
+			return err
+		}
+		b, err := json.Marshal(j.SampleTypeConfig)
+		if err != nil {
+			return err
+		}
+		fw.Write(b)
 	}
 	writer.Close()
 
