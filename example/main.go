@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"runtime/pprof"
+	"sync"
 
 	"github.com/pyroscope-io/client/pyroscope"
 )
@@ -17,30 +19,57 @@ func work(n int) {
 	// revive:enable:empty-block
 }
 
-func fastFunction(c context.Context) {
+var m sync.Mutex
+
+func fastFunction(c context.Context, wg *sync.WaitGroup) {
+	m.Lock()
+	defer m.Unlock()
+
 	pyroscope.TagWrapper(c, pyroscope.Labels("function", "fast"), func(c context.Context) {
 		work(200000000)
 	})
+	wg.Done()
 }
 
-func slowFunction(c context.Context) {
+func slowFunction(c context.Context, wg *sync.WaitGroup) {
+	m.Lock()
+	defer m.Unlock()
+
 	// standard pprof.Do wrappers work as well
 	pprof.Do(c, pprof.Labels("function", "slow"), func(c context.Context) {
 		work(800000000)
 	})
+	wg.Done()
 }
 
 func main() {
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{
 		ApplicationName: "simple.golang.app-new",
 		ServerAddress:   "http://localhost:4040", // this will run inside docker-compose, hence `pyroscope` for hostname
 		Logger:          pyroscope.StandardLogger,
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileInuseSpace,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileGoroutines,
+			pyroscope.ProfileMutexCount,
+			pyroscope.ProfileMutexDuration,
+			pyroscope.ProfileBlockCount,
+			pyroscope.ProfileBlockDuration,
+		},
 	})
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {
 		for {
-			fastFunction(c)
-			slowFunction(c)
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+			go fastFunction(c, &wg)
+			go slowFunction(c, &wg)
+			wg.Wait()
 		}
 	})
 }

@@ -26,9 +26,14 @@ type Session struct {
 	trieMutex sync.Mutex
 
 	// these things do change:
-	cpuBuf       *bytes.Buffer
-	memBuf       *bytes.Buffer
-	memPrevBytes []byte
+	cpuBuf         *bytes.Buffer
+	memBuf         *bytes.Buffer
+	memPrevBytes   []byte
+	goroutinesBuf  *bytes.Buffer
+	mutexBuf       *bytes.Buffer
+	mutexPrevBytes []byte
+	blockBuf       *bytes.Buffer
+	blockPrevBytes []byte
 
 	lastGCGeneration uint32
 	appName          string
@@ -63,6 +68,9 @@ func NewSession(c SessionConfig) (*Session, error) {
 		logger:        c.Logger,
 		cpuBuf:        &bytes.Buffer{},
 		memBuf:        &bytes.Buffer{},
+		goroutinesBuf: &bytes.Buffer{},
+		mutexBuf:      &bytes.Buffer{},
+		blockBuf:      &bytes.Buffer{},
 	}
 
 	return ps, nil
@@ -150,6 +158,33 @@ func (ps *Session) isMemEnabled() bool {
 	return false
 }
 
+func (ps *Session) isBlockEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileBlockCount || t == ProfileBlockDuration {
+			return true
+		}
+	}
+	return false
+}
+
+func (ps *Session) isMutexEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileMutexCount || t == ProfileMutexDuration {
+			return true
+		}
+	}
+	return false
+}
+
+func (ps *Session) isGoroutinesEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileGoroutines {
+			return true
+		}
+	}
+	return false
+}
+
 func (ps *Session) reset() {
 	now := time.Now()
 	endTime := now.Truncate(ps.uploadRate)
@@ -184,6 +219,96 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 		ps.cpuBuf.Reset()
+	}
+
+	if ps.isGoroutinesEnabled() {
+		p := pprof.Lookup("goroutine")
+		if p != nil {
+			p.WriteTo(ps.goroutinesBuf, 0)
+			ps.upstream.Upload(&upstream.UploadJob{
+				Name:            ps.appName,
+				StartTime:       startTime,
+				EndTime:         endTime,
+				SpyName:         "gospy",
+				Units:           "goroutines",
+				AggregationType: "average",
+				Format:          upstream.FormatPprof,
+				Profile:         copyBuf(ps.goroutinesBuf.Bytes()),
+				SampleTypeConfig: map[string]*upstream.SampleType{
+					"goroutine": {
+						DisplayName: "goroutines",
+						Units:       "goroutines",
+						Aggregation: "average",
+					},
+				},
+			})
+			ps.goroutinesBuf.Reset()
+		}
+	}
+
+	if ps.isBlockEnabled() {
+		p := pprof.Lookup("block")
+		if p != nil {
+			p.WriteTo(ps.blockBuf, 0)
+			curBlockBuf := copyBuf(ps.blockBuf.Bytes())
+			ps.blockBuf.Reset()
+			if ps.blockPrevBytes != nil {
+				ps.upstream.Upload(&upstream.UploadJob{
+					Name:        ps.appName,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					SpyName:     "gospy",
+					Format:      upstream.FormatPprof,
+					Profile:     curBlockBuf,
+					PrevProfile: ps.blockPrevBytes,
+					SampleTypeConfig: map[string]*upstream.SampleType{
+						"contentions": {
+							DisplayName: "block_count",
+							Units:       "lock_samples",
+							Cumulative:  true,
+						},
+						"delay": {
+							DisplayName: "block_duration",
+							Units:       "lock_nanoseconds",
+							Cumulative:  true,
+						},
+					},
+				})
+			}
+			ps.blockPrevBytes = curBlockBuf
+		}
+	}
+	if ps.isMutexEnabled() {
+		p := pprof.Lookup("mutex")
+		if p != nil {
+			p.WriteTo(ps.mutexBuf, 0)
+			curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
+			ps.mutexBuf.Reset()
+			if ps.mutexPrevBytes != nil {
+				ps.upstream.Upload(&upstream.UploadJob{
+					Name:        ps.appName,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					SpyName:     "gospy",
+					Format:      upstream.FormatPprof,
+					Profile:     curMutexBuf,
+					PrevProfile: ps.mutexPrevBytes,
+					SampleTypeConfig: map[string]*upstream.SampleType{
+						"contentions": {
+							DisplayName: "mutex_count",
+							Units:       "lock_samples",
+							Cumulative:  true,
+						},
+						"delay": {
+							DisplayName: "mutex_duration",
+							Units:       "lock_nanoseconds",
+							Cumulative:  true,
+						},
+					},
+				})
+			}
+			ps.mutexPrevBytes = curMutexBuf
+		}
 	}
 
 	if ps.isMemEnabled() {
