@@ -195,7 +195,9 @@ func (ps *Session) reset() {
 	if !ps.startTime.IsZero() {
 		ps.uploadData(startTime, endTime)
 	} else {
-		pprof.StartCPUProfile(ps.cpuBuf)
+		if ps.isCPUEnabled() {
+			pprof.StartCPUProfile(ps.cpuBuf)
+		}
 	}
 
 	ps.startTime = endTime
