@@ -66,20 +66,21 @@ func NewSession(c SessionConfig) (*Session, error) {
 	}
 
 	ps := &Session{
-		upstream:      c.Upstream,
-		appName:       appName,
-		profileTypes:  c.ProfilingTypes,
-		disableGCRuns: c.DisableGCRuns,
-		sampleRate:    c.SampleRate,
-		uploadRate:    c.UploadRate,
-		stopCh:        make(chan struct{}),
-		flushCh:       make(chan *flush),
-		logger:        c.Logger,
-		cpuBuf:        &bytes.Buffer{},
-		memBuf:        &bytes.Buffer{},
-		goroutinesBuf: &bytes.Buffer{},
-		mutexBuf:      &bytes.Buffer{},
-		blockBuf:      &bytes.Buffer{},
+		upstream:               c.Upstream,
+		appName:                appName,
+		profileTypes:           c.ProfilingTypes,
+		disableGCRuns:          c.DisableGCRuns,
+		DisableAutomaticResets: c.DisableAutomaticResets,
+		sampleRate:             c.SampleRate,
+		uploadRate:             c.UploadRate,
+		stopCh:                 make(chan struct{}),
+		flushCh:                make(chan *flush),
+		logger:                 c.Logger,
+		cpuBuf:                 &bytes.Buffer{},
+		memBuf:                 &bytes.Buffer{},
+		goroutinesBuf:          &bytes.Buffer{},
+		mutexBuf:               &bytes.Buffer{},
+		blockBuf:               &bytes.Buffer{},
 	}
 
 	return ps, nil
@@ -380,7 +381,7 @@ func (ps *Session) uploadLastBitOfData(now time.Time) {
 	}
 }
 
-func (ps *Session) Flush(wait bool) {
+func (ps *Session) flush(wait bool) {
 	f := &flush{
 		wg:   sync.WaitGroup{},
 		wait: wait,
