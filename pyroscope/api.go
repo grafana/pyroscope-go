@@ -15,10 +15,11 @@ type Config struct {
 	Tags            map[string]string
 	ServerAddress   string // e.g http://pyroscope.services.internal:4040
 	AuthToken       string // specify this token when using pyroscope cloud
-	SampleRate      uint32
+	SampleRate      uint32 // todo this one is not used
 	Logger          Logger
 	ProfileTypes    []ProfileType
 	DisableGCRuns   bool // this will disable automatic runtime.GC runs between getting the heap profiles
+	ManualFlush     bool // disable periodic profiler flush every 10 seconds. Library user is expected to call Flush periodically, manually.
 }
 
 type Profiler struct {
@@ -79,7 +80,7 @@ func Start(cfg Config) (*Profiler, error) {
 		return nil, fmt.Errorf("new session: %w", err)
 	}
 	uploader.Start()
-	if err = s.Start(); err != nil {
+	if err = s.start(); err != nil {
 		return nil, fmt.Errorf("start session: %w", err)
 	}
 
@@ -87,10 +88,13 @@ func Start(cfg Config) (*Profiler, error) {
 }
 
 // Stop stops continious profiling session and uploads the remaining profiling data
-func (p *Profiler) Stop() error {
+func (p *Profiler) Stop() {
 	p.session.Stop()
 	p.uploader.Stop()
-	return nil
+}
+
+func (p *Profiler) Flush(syncUpload bool) {
+	p.session.Flush(syncUpload)
 }
 
 type LabelSet = pprof.LabelSet
