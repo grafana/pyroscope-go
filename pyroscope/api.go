@@ -89,9 +89,10 @@ func Start(cfg Config) (*Profiler, error) {
 }
 
 // Stop stops continuous profiling session and uploads the remaining profiling data
-func (p *Profiler) Stop() {
+func (p *Profiler) Stop() error {
 	p.session.Stop()
 	p.uploader.Stop()
+	return nil
 }
 
 // Flush resets current profiling session. if wait is true, also waits for all profiles to be uploaded synchronously
