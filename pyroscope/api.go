@@ -47,7 +47,7 @@ func Start(cfg Config) (*Profiler, error) {
 	rc := remote.Config{
 		AuthToken: cfg.AuthToken,
 		Address:   cfg.ServerAddress,
-		Threads:   4,
+		Threads:   5, // per each profile type upload
 		Timeout:   30 * time.Second,
 		Logger:    cfg.Logger,
 	}
