@@ -5,6 +5,7 @@ import (
 	"fmt"
 	pprofile "github.com/google/pprof/profile"
 	"github.com/pyroscope-io/client/upstream"
+	"time"
 )
 
 type ProfileMerger struct {
@@ -77,7 +78,11 @@ func NewMergers() *Mergers {
 // todo should we disableClientSideMerge if we fail to merge or keep trying?
 // todo should we filter by enabled ps.profileTypes to reduce profile size ? maybe add a separate option ?
 func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
-
+	t1 := time.Now()
+	defer func() { //todo remove before merge
+		t2 := time.Now()
+		fmt.Printf("Profile %v merged in %v\n", m.SampleTypes, t2.Sub(t1))
+	}()
 	duration := j.EndTime.Sub(j.StartTime)
 	p2, err := m.parseProfile(j.Profile)
 	if err != nil {
