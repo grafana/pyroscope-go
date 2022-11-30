@@ -43,7 +43,7 @@ type Session struct {
 	appName          string
 	startTime        time.Time
 
-	merger *cumulative.MultiMerger
+	mergers *cumulative.Mergers
 }
 
 type SessionConfig struct {
@@ -88,7 +88,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		mutexBuf:               &bytes.Buffer{},
 		blockBuf:               &bytes.Buffer{},
 
-		merger: cumulative.NewMultiMerger(),
+		mergers: cumulative.NewMergers(),
 	}
 	return ps, nil
 }
@@ -294,7 +294,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					},
 				}
 				if !ps.disableCumulativeMerge {
-					err := ps.merger.Block.Merge(job)
+					err := ps.mergers.Block.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge block profiles %v", err)
 					}
@@ -333,7 +333,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					},
 				}
 				if !ps.disableCumulativeMerge {
-					err := ps.merger.Mutex.Merge(job)
+					err := ps.mergers.Mutex.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge mutex profiles %v", err)
 					}
@@ -369,7 +369,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					PrevProfile: ps.memPrevBytes,
 				}
 				if !ps.disableCumulativeMerge {
-					err := ps.merger.Heap.Merge(job)
+					err := ps.mergers.Heap.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge heap profiles %v", err)
 					}

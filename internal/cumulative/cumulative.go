@@ -15,14 +15,14 @@ type ProfileMerger struct {
 	prev *pprofile.Profile
 }
 
-type MultiMerger struct { //todo better name
+type Mergers struct {
 	Heap  *ProfileMerger
 	Block *ProfileMerger
 	Mutex *ProfileMerger
 }
 
-func NewMultiMerger() *MultiMerger {
-	return &MultiMerger{
+func NewMergers() *Mergers {
+	return &Mergers{
 		Block: &ProfileMerger{
 			SampleTypes: []string{"contentions", "delay"},
 			MergeRatios: []float64{-1, -1},
