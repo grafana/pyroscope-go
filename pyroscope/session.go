@@ -3,6 +3,7 @@ package pyroscope
 import (
 	"bytes"
 	"github.com/pyroscope-io/client/internal/alignedticker"
+	"github.com/pyroscope-io/client/internal/cumulative"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -19,6 +20,7 @@ type Session struct {
 	profileTypes           []ProfileType
 	uploadRate             time.Duration
 	disableGCRuns          bool
+	disableClientSideMerge bool
 	DisableAutomaticResets bool
 
 	logger    Logger
@@ -40,6 +42,8 @@ type Session struct {
 	lastGCGeneration uint32
 	appName          string
 	startTime        time.Time
+
+	merger *cumulative.MultiMerger
 }
 
 type SessionConfig struct {
@@ -81,8 +85,9 @@ func NewSession(c SessionConfig) (*Session, error) {
 		goroutinesBuf:          &bytes.Buffer{},
 		mutexBuf:               &bytes.Buffer{},
 		blockBuf:               &bytes.Buffer{},
-	}
 
+		merger: cumulative.NewMultiMerger(),
+	}
 	return ps, nil
 }
 
@@ -265,7 +270,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			curBlockBuf := copyBuf(ps.blockBuf.Bytes())
 			ps.blockBuf.Reset()
 			if ps.blockPrevBytes != nil {
-				ps.upstream.Upload(&upstream.UploadJob{
+				job := &upstream.UploadJob{
 					Name:        ps.appName,
 					StartTime:   startTime,
 					EndTime:     endTime,
@@ -285,7 +290,14 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 							Cumulative:  true,
 						},
 					},
-				})
+				}
+				if !ps.disableClientSideMerge {
+					err := ps.merger.Block.Merge(job)
+					if err != nil {
+						ps.logger.Errorf("failed to merge block profiles %v", err)
+					}
+				}
+				ps.upstream.Upload(job)
 			}
 			ps.blockPrevBytes = curBlockBuf
 		}
@@ -297,7 +309,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
 			ps.mutexBuf.Reset()
 			if ps.mutexPrevBytes != nil {
-				ps.upstream.Upload(&upstream.UploadJob{
+				job := &upstream.UploadJob{
 					Name:        ps.appName,
 					StartTime:   startTime,
 					EndTime:     endTime,
@@ -317,7 +329,14 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 							Cumulative:  true,
 						},
 					},
-				})
+				}
+				if !ps.disableClientSideMerge {
+					err := ps.merger.Mutex.Merge(job)
+					if err != nil {
+						ps.logger.Errorf("failed to merge mutex profiles %v", err)
+					}
+				}
+				ps.upstream.Upload(job)
 			}
 			ps.mutexPrevBytes = curMutexBuf
 		}
@@ -336,8 +355,8 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			pprof.WriteHeapProfile(ps.memBuf)
 			curMemBytes := copyBuf(ps.memBuf.Bytes())
 			ps.memBuf.Reset()
-			if ps.memPrevBytes != nil {
-				ps.upstream.Upload(&upstream.UploadJob{
+			if ps.memPrevBytes != nil { //todo does this if statement loose first 10s profile?
+				job := &upstream.UploadJob{
 					Name:        ps.appName,
 					StartTime:   startTime,
 					EndTime:     endTime,
@@ -346,7 +365,14 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					Format:      upstream.FormatPprof,
 					Profile:     curMemBytes,
 					PrevProfile: ps.memPrevBytes,
-				})
+				}
+				if !ps.disableClientSideMerge {
+					err := ps.merger.Heap.Merge(job)
+					if err != nil {
+						ps.logger.Errorf("failed to merge heap profiles %v", err)
+					}
+				}
+				ps.upstream.Upload(job)
 			}
 			ps.memPrevBytes = curMemBytes
 			ps.lastGCGeneration = currentGCGeneration
