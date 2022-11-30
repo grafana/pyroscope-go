@@ -20,7 +20,7 @@ type Session struct {
 	profileTypes           []ProfileType
 	uploadRate             time.Duration
 	disableGCRuns          bool
-	disableClientSideMerge bool
+	disableCumulativeMerge bool
 	DisableAutomaticResets bool
 
 	logger    Logger
@@ -54,6 +54,7 @@ type SessionConfig struct {
 	ProfilingTypes         []ProfileType
 	DisableGCRuns          bool
 	DisableAutomaticResets bool
+	DisableCumulativeMerge bool
 	SampleRate             uint32
 	UploadRate             time.Duration
 }
@@ -75,6 +76,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		profileTypes:           c.ProfilingTypes,
 		disableGCRuns:          c.DisableGCRuns,
 		DisableAutomaticResets: c.DisableAutomaticResets,
+		disableCumulativeMerge: c.DisableCumulativeMerge,
 		sampleRate:             c.SampleRate,
 		uploadRate:             c.UploadRate,
 		stopCh:                 make(chan struct{}),
@@ -291,7 +293,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 						},
 					},
 				}
-				if !ps.disableClientSideMerge {
+				if !ps.disableCumulativeMerge {
 					err := ps.merger.Block.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge block profiles %v", err)
@@ -330,7 +332,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 						},
 					},
 				}
-				if !ps.disableClientSideMerge {
+				if !ps.disableCumulativeMerge {
 					err := ps.merger.Mutex.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge mutex profiles %v", err)
@@ -366,7 +368,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					Profile:     curMemBytes,
 					PrevProfile: ps.memPrevBytes,
 				}
-				if !ps.disableClientSideMerge {
+				if !ps.disableCumulativeMerge {
 					err := ps.merger.Heap.Merge(job)
 					if err != nil {
 						ps.logger.Errorf("failed to merge heap profiles %v", err)
