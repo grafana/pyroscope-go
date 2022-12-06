@@ -109,6 +109,3 @@ var Labels = pprof.Labels
 func TagWrapper(ctx context.Context, labels LabelSet, cb func(context.Context)) {
 	pprof.Do(ctx, labels, func(c context.Context) { cb(c) })
 }
-
-// todo remove before merge
-var DebugStatsCallback func(name string, p1len, p2len, p3len, p3negative int)

@@ -34,3 +34,6 @@ type UploadJob struct {
 	PrevProfile      []byte
 	SampleTypeConfig map[string]*SampleType
 }
+
+// todo remove before merge
+var DebugStatsCallback func(name string, p1len, p2len, p3len, p3negative int)
