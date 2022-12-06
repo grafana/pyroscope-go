@@ -14,6 +14,7 @@ type ProfileMerger struct {
 	SampleTypeConfig map[string]*upstream.SampleType
 
 	prev *pprofile.Profile
+	name string
 }
 
 type Mergers struct {
@@ -21,6 +22,9 @@ type Mergers struct {
 	Block *ProfileMerger
 	Mutex *ProfileMerger
 }
+
+// todo remove before merge
+var DebugStatsCallback func(name string, p1len, p2len, p3len, p3negative int)
 
 func NewMergers() *Mergers {
 	return &Mergers{
@@ -37,6 +41,7 @@ func NewMergers() *Mergers {
 					Units:       "lock_nanoseconds",
 				},
 			},
+			name: "block",
 		},
 		Mutex: &ProfileMerger{
 			SampleTypes: []string{"contentions", "delay"},
@@ -51,6 +56,7 @@ func NewMergers() *Mergers {
 					Units:       "lock_nanoseconds",
 				},
 			},
+			name: "mutex",
 		},
 		Heap: &ProfileMerger{
 			SampleTypes: []string{"alloc_objects", "alloc_space", "inuse_objects", "inuse_space"},
@@ -71,11 +77,11 @@ func NewMergers() *Mergers {
 					Aggregation: "average",
 				},
 			},
+			name: "heap",
 		},
 	}
 }
 
-// todo should we disableClientSideMerge if we fail to merge or keep trying?
 // todo should we filter by enabled ps.profileTypes to reduce profile size ? maybe add a separate option ?
 func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	t1 := time.Now()
@@ -107,6 +113,17 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	}
 	p.DurationNanos = duration.Nanoseconds()
 
+	negative := 0
+	for _, sample := range p.Sample {
+		if sample.Value[0] < 0 {
+			for i := range sample.Value {
+				sample.Value[i] = 0
+				negative += 1
+			}
+		}
+	}
+	p = p.Compact()
+
 	var prof bytes.Buffer
 	err = p.Write(&prof)
 	if err != nil {
@@ -117,6 +134,11 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	j.Profile = prof.Bytes()
 	j.PrevProfile = nil
 	j.SampleTypeConfig = m.SampleTypeConfig
+
+	cb := DebugStatsCallback
+	if cb != nil {
+		cb(m.name, len(p1.Sample), len(p2.Sample), len(p.Sample), negative)
+	}
 	return nil
 }
 
