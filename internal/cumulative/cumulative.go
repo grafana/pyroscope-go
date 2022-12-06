@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	pprofile "github.com/google/pprof/profile"
-	"github.com/pyroscope-io/client/pyroscope"
 	"github.com/pyroscope-io/client/upstream"
 	"time"
 )
@@ -131,7 +130,7 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	j.PrevProfile = nil
 	j.SampleTypeConfig = m.SampleTypeConfig
 
-	cb := pyroscope.DebugStatsCallback
+	cb := upstream.DebugStatsCallback
 	if cb != nil {
 		cb(m.name, len(p1.Sample), len(p2.Sample), len(p.Sample), negative)
 	}
