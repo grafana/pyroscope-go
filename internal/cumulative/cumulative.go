@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	pprofile "github.com/google/pprof/profile"
+	"github.com/pyroscope-io/client/pyroscope"
 	"github.com/pyroscope-io/client/upstream"
 	"time"
 )
@@ -22,9 +23,6 @@ type Mergers struct {
 	Block *ProfileMerger
 	Mutex *ProfileMerger
 }
-
-// todo remove before merge
-var DebugStatsCallback func(name string, p1len, p2len, p3len, p3negative int)
 
 func NewMergers() *Mergers {
 	return &Mergers{
@@ -133,7 +131,7 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	j.PrevProfile = nil
 	j.SampleTypeConfig = m.SampleTypeConfig
 
-	cb := DebugStatsCallback
+	cb := pyroscope.DebugStatsCallback
 	if cb != nil {
 		cb(m.name, len(p1.Sample), len(p2.Sample), len(p.Sample), negative)
 	}
