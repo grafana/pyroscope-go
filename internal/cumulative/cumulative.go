@@ -89,7 +89,6 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 		t2 := time.Now()
 		fmt.Printf("Profile %v merged in %v\n", m.SampleTypes, t2.Sub(t1))
 	}()
-	duration := j.EndTime.Sub(j.StartTime)
 	p2, err := m.parseProfile(j.Profile)
 	if err != nil {
 		return err
@@ -111,7 +110,6 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 	if err != nil {
 		return err
 	}
-	p.DurationNanos = duration.Nanoseconds()
 
 	negative := 0
 	for _, sample := range p.Sample {
