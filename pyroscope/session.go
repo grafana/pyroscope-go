@@ -3,7 +3,7 @@ package pyroscope
 import (
 	"bytes"
 	"github.com/pyroscope-io/client/internal/alignedticker"
-	"github.com/pyroscope-io/client/upstream/cumulativepprof"
+	"github.com/pyroscope-io/client/internal/cumulativepprof"
 	"runtime"
 	"runtime/pprof"
 	"sync"
