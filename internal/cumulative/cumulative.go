@@ -109,7 +109,6 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 			}
 		}
 	}
-	p = p.Compact()
 
 	var prof bytes.Buffer
 	err = p.Write(&prof)
