@@ -3,7 +3,7 @@ package pyroscope
 import (
 	"bytes"
 	"github.com/pyroscope-io/client/internal/alignedticker"
-	"github.com/pyroscope-io/client/internal/cumulative"
+	"github.com/pyroscope-io/client/upstream/cumulativepprof"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -43,7 +43,7 @@ type Session struct {
 	appName          string
 	startTime        time.Time
 
-	mergers *cumulative.Mergers
+	mergers *cumulativepprof.Mergers
 }
 
 type SessionConfig struct {
@@ -88,7 +88,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		mutexBuf:               &bytes.Buffer{},
 		blockBuf:               &bytes.Buffer{},
 
-		mergers: cumulative.NewMergers(),
+		mergers: cumulativepprof.NewMergers(),
 	}
 	return ps, nil
 }
@@ -293,12 +293,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 						},
 					},
 				}
-				if !ps.disableCumulativeMerge {
-					err := ps.mergers.Block.Merge(job)
-					if err != nil {
-						ps.logger.Errorf("failed to merge block profiles %v", err)
-					}
-				}
+				ps.mergeCumulativeProfile(ps.mergers.Block, job)
 				ps.upstream.Upload(job)
 			}
 			ps.blockPrevBytes = curBlockBuf
@@ -332,12 +327,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 						},
 					},
 				}
-				if !ps.disableCumulativeMerge {
-					err := ps.mergers.Mutex.Merge(job)
-					if err != nil {
-						ps.logger.Errorf("failed to merge mutex profiles %v", err)
-					}
-				}
+				ps.mergeCumulativeProfile(ps.mergers.Mutex, job)
 				ps.upstream.Upload(job)
 			}
 			ps.mutexPrevBytes = curMutexBuf
@@ -368,18 +358,34 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 					Profile:     curMemBytes,
 					PrevProfile: ps.memPrevBytes,
 				}
-				if !ps.disableCumulativeMerge {
-					err := ps.mergers.Heap.Merge(job)
-					if err != nil {
-						ps.logger.Errorf("failed to merge heap profiles %v", err)
-					}
-				}
+				ps.mergeCumulativeProfile(ps.mergers.Heap, job)
 				ps.upstream.Upload(job)
 			}
 			ps.memPrevBytes = curMemBytes
 			ps.lastGCGeneration = currentGCGeneration
 		}
 	}
+}
+
+func (ps *Session) mergeCumulativeProfile(m *cumulativepprof.Merger, job *upstream.UploadJob) {
+	// todo should we filter by enabled ps.profileTypes to reduce profile size ? maybe add a separate option ?
+	if ps.disableCumulativeMerge {
+		return
+	}
+	p, err := m.Merge(job.PrevProfile, job.Profile)
+	if err != nil {
+		ps.logger.Errorf("failed to merge %s profiles %v", m.Name, err)
+		return
+	}
+	var prof bytes.Buffer
+	err = p.Write(&prof)
+	if err != nil {
+		ps.logger.Errorf("failed to serialize merged %s profiles %v", m.Name, err)
+		return
+	}
+	job.PrevProfile = nil
+	job.Profile = prof.Bytes()
+	job.SampleTypeConfig = m.SampleTypeConfig
 }
 
 func (ps *Session) Stop() {

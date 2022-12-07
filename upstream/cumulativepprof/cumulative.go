@@ -1,4 +1,4 @@
-package cumulative
+package cumulativepprof
 
 import (
 	"bytes"
@@ -7,24 +7,24 @@ import (
 	"github.com/pyroscope-io/client/upstream"
 )
 
-type ProfileMerger struct {
+type Merger struct {
 	SampleTypes      []string
 	MergeRatios      []float64
 	SampleTypeConfig map[string]*upstream.SampleType
+	Name             string
 
 	prev *pprofile.Profile
-	name string
 }
 
 type Mergers struct {
-	Heap  *ProfileMerger
-	Block *ProfileMerger
-	Mutex *ProfileMerger
+	Heap  *Merger
+	Block *Merger
+	Mutex *Merger
 }
 
 func NewMergers() *Mergers {
 	return &Mergers{
-		Block: &ProfileMerger{
+		Block: &Merger{
 			SampleTypes: []string{"contentions", "delay"},
 			MergeRatios: []float64{-1, -1},
 			SampleTypeConfig: map[string]*upstream.SampleType{
@@ -37,9 +37,9 @@ func NewMergers() *Mergers {
 					Units:       "lock_nanoseconds",
 				},
 			},
-			name: "block",
+			Name: "block",
 		},
-		Mutex: &ProfileMerger{
+		Mutex: &Merger{
 			SampleTypes: []string{"contentions", "delay"},
 			MergeRatios: []float64{-1, -1},
 			SampleTypeConfig: map[string]*upstream.SampleType{
@@ -52,9 +52,9 @@ func NewMergers() *Mergers {
 					Units:       "lock_nanoseconds",
 				},
 			},
-			name: "mutex",
+			Name: "mutex",
 		},
-		Heap: &ProfileMerger{
+		Heap: &Merger{
 			SampleTypes: []string{"alloc_objects", "alloc_space", "inuse_objects", "inuse_space"},
 			MergeRatios: []float64{-1, -1, 0, 0},
 			SampleTypeConfig: map[string]*upstream.SampleType{
@@ -73,33 +73,32 @@ func NewMergers() *Mergers {
 					Aggregation: "average",
 				},
 			},
-			name: "heap",
+			Name: "heap",
 		},
 	}
 }
 
-// todo should we filter by enabled ps.profileTypes to reduce profile size ? maybe add a separate option ?
-func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
-	p2, err := m.parseProfile(j.Profile)
+func (m *Merger) Merge(prev, cur []byte) (*pprofile.Profile, error) {
+	p2, err := m.parseProfile(cur)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	p1 := m.prev
 	if p1 == nil {
-		p1, err = m.parseProfile(j.PrevProfile)
+		p1, err = m.parseProfile(prev)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	err = p1.ScaleN(m.MergeRatios)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	p, err := pprofile.Merge([]*pprofile.Profile{p1, p2})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, sample := range p.Sample {
@@ -110,20 +109,11 @@ func (m *ProfileMerger) Merge(j *upstream.UploadJob) error {
 		}
 	}
 
-	var prof bytes.Buffer
-	err = p.Write(&prof)
-	if err != nil {
-		return err
-	}
-
 	m.prev = p2
-	j.Profile = prof.Bytes()
-	j.PrevProfile = nil
-	j.SampleTypeConfig = m.SampleTypeConfig
-	return nil
+	return p, nil
 }
 
-func (m *ProfileMerger) parseProfile(bs []byte) (*pprofile.Profile, error) {
+func (m *Merger) parseProfile(bs []byte) (*pprofile.Profile, error) {
 	var prof = bytes.NewBuffer(bs)
 	p, err := pprofile.Parse(prof)
 	if err != nil {
