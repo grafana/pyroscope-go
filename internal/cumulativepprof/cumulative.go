@@ -1,7 +1,6 @@
 package cumulativepprof
 
 import (
-	"bytes"
 	"fmt"
 	pprofile "github.com/google/pprof/profile"
 	"github.com/pyroscope-io/client/upstream"
@@ -114,8 +113,7 @@ func (m *Merger) Merge(prev, cur []byte) (*pprofile.Profile, error) {
 }
 
 func (m *Merger) parseProfile(bs []byte) (*pprofile.Profile, error) {
-	var prof = bytes.NewBuffer(bs)
-	p, err := pprofile.Parse(prof)
+	p, err := pprofile.ParseData(bs)
 	if err != nil {
 		return nil, err
 	}
