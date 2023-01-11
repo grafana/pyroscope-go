@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/felixge/fgprof"
 	"github.com/pyroscope-io/client/internal/flameql"
 	"github.com/pyroscope-io/client/upstream"
 )
@@ -27,6 +28,8 @@ type Session struct {
 
 	// these things do change:
 	cpuBuf         *bytes.Buffer
+	wallBuf        *bytes.Buffer
+	stopWallBuf    func() error
 	memBuf         *bytes.Buffer
 	memPrevBytes   []byte
 	goroutinesBuf  *bytes.Buffer
@@ -67,6 +70,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		stopCh:        make(chan struct{}),
 		logger:        c.Logger,
 		cpuBuf:        &bytes.Buffer{},
+		wallBuf:       &bytes.Buffer{},
 		memBuf:        &bytes.Buffer{},
 		goroutinesBuf: &bytes.Buffer{},
 		mutexBuf:      &bytes.Buffer{},
@@ -149,6 +153,15 @@ func (ps *Session) isCPUEnabled() bool {
 	return false
 }
 
+func (ps *Session) isWallEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileWall {
+			return true
+		}
+	}
+	return false
+}
+
 func (ps *Session) isMemEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileInuseObjects || t == ProfileAllocObjects || t == ProfileInuseSpace || t == ProfileAllocSpace {
@@ -219,6 +232,31 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 		ps.cpuBuf.Reset()
+	}
+
+	if ps.isWallEnabled() {
+		if ps.stopWallBuf != nil {
+			ps.stopWallBuf()
+		}
+
+		defer func() {
+			ps.stopWallBuf = fgprof.Start(ps.wallBuf, fgprof.FormatPprof)
+		}()
+
+		ps.upstream.Upload(&upstream.UploadJob{
+			Name:       ps.appName,
+			StartTime:  startTime,
+			EndTime:    endTime,
+			SpyName:    "gospy",
+			SampleRate: 100,
+			// TODO: since suffix comes from the server's parser
+			// We need to create a different unit
+			Units:           "samples",
+			AggregationType: "sum",
+			Format:          upstream.FormatPprof,
+			Profile:         copyBuf(ps.wallBuf.Bytes()),
+		})
+		ps.wallBuf.Reset()
 	}
 
 	if ps.isGoroutinesEnabled() {
