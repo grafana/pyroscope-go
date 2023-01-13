@@ -681,15 +681,15 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 	// It also removes from line any spaces following the field.
 	next := func() []byte {
 		var f []byte
-		f, line, _ = bytes.Cut(line, space)
+		f, line, _ = bytesCut(line, space)
 		line = bytes.TrimLeft(line, " ")
 		return f
 	}
 
 	for len(data) > 0 {
-		line, data, _ = bytes.Cut(data, newline)
+		line, data, _ = bytesCut(data, newline)
 		addr := next()
-		loStr, hiStr, ok := strings.Cut(string(addr), "-")
+		loStr, hiStr, ok := stringsCut(string(addr), "-")
 		if !ok {
 			continue
 		}
@@ -759,4 +759,28 @@ func (b *profileBuilder) addMappingEntry(lo, hi, offset uint64, file, buildID st
 		buildID: buildID,
 		fake:    fake,
 	})
+}
+
+// Cut slices s around the first instance of sep,
+// returning the text before and after sep.
+// The found result reports whether sep appears in s.
+// If sep does not appear in s, cut returns s, nil, false.
+//
+// Cut returns slices of the original slice s, not copies.
+func bytesCut(s, sep []byte) (before, after []byte, found bool) {
+	if i := bytes.Index(s, sep); i >= 0 {
+		return s[:i], s[i+len(sep):], true
+	}
+	return s, nil, false
+}
+
+// Cut slices s around the first instance of sep,
+// returning the text before and after sep.
+// The found result reports whether sep appears in s.
+// If sep does not appear in s, cut returns s, "", false.
+func stringsCut(s, sep string) (before, after string, found bool) {
+	if i := strings.Index(s, sep); i >= 0 {
+		return s[:i], s[i+len(sep):], true
+	}
+	return s, "", false
 }
