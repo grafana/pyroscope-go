@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/pyroscope-io/client/heap"
@@ -48,7 +49,11 @@ func main() {
 	go func() {
 		hp := heap.DeltaHeapProfiler{}
 		for {
-			hp.Profile()
+			buf := bytes.NewBuffer(nil)
+			err := hp.Profile(buf)
+			if err != nil {
+				fmt.Println(err)
+			}
 			time.Sleep(10 * time.Second)
 		}
 	}()

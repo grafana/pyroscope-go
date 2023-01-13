@@ -16,17 +16,22 @@ type profMap struct {
 	freeStk []uintptr
 }
 
+type count struct {
+	AllocObjects int64
+	AllocBytes   int64
+}
+
 // A profMapEntry is a single entry in the profMap.
 type profMapEntry struct {
 	nextHash *profMapEntry // next in hash list
 	nextAll  *profMapEntry // next in list of all entries
 	stk      []uintptr
 	tag      unsafe.Pointer
-	count    int64
+	count    count
 }
 
 // todo there are no tags for heap profiles, we could remove it
-func (m *profMap) lookup(stk []uint64, tag unsafe.Pointer) *profMapEntry {
+func (m *profMap) Lookup(stk []uintptr, tag unsafe.Pointer) *profMapEntry {
 	// Compute hash of (stk, tag).
 	h := uintptr(0)
 	for _, x := range stk {

@@ -1,7 +1,3 @@
-// Copyright 2016 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package pprof
 
 import (
@@ -9,10 +5,15 @@ import (
 	"math"
 	"runtime"
 	"strings"
+	"unsafe"
 )
 
+type DeltaHeapProfiler struct {
+	m profMap
+}
+
 // WriteHeapProto writes the current heap profile in protobuf format to w.
-func WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
+func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
 	b := newProfileBuilder(w)
 	b.pbValueType(tagProfile_PeriodType, "space", "bytes")
 	b.pb.int64Opt(tagProfile_Period, rate)
@@ -50,16 +51,25 @@ func WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defau
 			hideRuntime = false // try again, and show all frames next time.
 		}
 
-		values[0], values[1] = scaleHeapSample(r.AllocObjects, r.AllocBytes, rate)
+		// do the delta
+		entry := d.m.Lookup(r.Stack(), unsafe.Pointer(uintptr(0)))
+		//todo should we check for negative here
+		AllocObjects := r.AllocObjects - entry.count.AllocObjects
+		AllocBytes := r.AllocBytes - entry.count.AllocBytes
+		entry.count.AllocObjects = r.AllocObjects
+		entry.count.AllocBytes = r.AllocBytes
+
+		values[0], values[1] = scaleHeapSample(AllocObjects, AllocBytes, rate)
 		values[2], values[3] = scaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
-		var blockSize int64
-		if r.AllocObjects > 0 {
-			blockSize = r.AllocBytes / r.AllocObjects
-		}
+		//var blockSize int64
+		//if r.AllocObjects > 0 {
+		//	blockSize = r.AllocBytes / r.AllocObjects
+		//}
+		// todo should we skip if values are 0?
 		b.pbSample(values, locs, func() {
-			if blockSize != 0 {
-				b.pbLabel(tagSample_Label, "bytes", "", blockSize)
-			}
+			//if blockSize != 0 {
+			//	b.pbLabel(tagSample_Label, "bytes", "", blockSize)
+			//}
 		})
 	}
 	b.build()

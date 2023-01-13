@@ -1,16 +1,16 @@
 package heap
 
 import (
-	"bytes"
 	"github.com/pyroscope-io/client/heap/internal/pprof"
+	"io"
 	"runtime"
 )
 
 type DeltaHeapProfiler struct {
+	impl pprof.DeltaHeapProfiler
 }
 
-func (d *DeltaHeapProfiler) Profile() error {
-
+func (d *DeltaHeapProfiler) Profile(w io.Writer) error {
 	// Find out how many records there are (MemProfile(nil, true)),
 	// allocate that many records, and get the data.
 	// There's a race—more records might be added between
@@ -32,8 +32,5 @@ func (d *DeltaHeapProfiler) Profile() error {
 		// Profile grew; try again.
 	}
 
-	w := bytes.NewBuffer(nil)
-
-	err := pprof.WriteHeapProto(w, p, int64(runtime.MemProfileRate), "")
-	return err
+	return d.impl.WriteHeapProto(w, p, int64(runtime.MemProfileRate), "")
 }
