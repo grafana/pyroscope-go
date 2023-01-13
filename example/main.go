@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/pyroscope-io/client/heap"
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"github.com/pyroscope-io/client/pyroscope"
 )
@@ -43,6 +45,13 @@ func slowFunction(c context.Context, wg *sync.WaitGroup) {
 }
 
 func main() {
+	go func() {
+		hp := heap.DeltaHeapProfiler{}
+		for {
+			hp.Profile()
+			time.Sleep(10 * time.Second)
+		}
+	}()
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{
@@ -72,4 +81,5 @@ func main() {
 			wg.Wait()
 		}
 	})
+
 }
