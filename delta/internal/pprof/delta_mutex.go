@@ -31,7 +31,7 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycl
 		inanosec := int64(nanosec)
 
 		// do the delta
-		entry := d.m.Lookup(r.Stack())
+		entry := d.m.Lookup(r.Stack(), 0)
 		values[0] = count - entry.count.v1
 		values[1] = inanosec - entry.count.v2
 		entry.count.v1 = count

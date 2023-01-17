@@ -1,6 +1,7 @@
 package pprof
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"runtime"
@@ -51,8 +52,38 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 		}
 
 		// do the delta
-		entry := d.m.Lookup(r.Stack())
-		//todo should we check for negative here
+		pp := func(prefix string, stk []uintptr) {
+			frames1 := runtime.CallersFrames(stk)
+			for {
+				f, more := frames1.Next()
+				if !more {
+					break
+				}
+				fmt.Printf("[dhp] %s %s\n", prefix, f.Func.Name())
+			}
+		}
+		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
+			// it is a fresh bucket and it will be published after next 1-2 gc cycles
+			continue
+		}
+		size := int64(0)
+		if r.AllocObjects != 0 {
+			if r.AllocBytes%r.AllocObjects != 0 {
+				fmt.Printf("[dhp] warning: %d %d\n", r.AllocObjects, r.AllocBytes)
+				pp("mod", r.Stack())
+			}
+			size = r.AllocBytes / r.AllocObjects
+		} else {
+			fmt.Printf("[dhp] zero\n")
+			pp("zero", r.Stack())
+		}
+		entry := d.m.Lookup(r.Stack(), uintptr(size))
+
+		if (r.AllocObjects - entry.count.v1) < 0 {
+			pp("neg 1", r.Stack())
+			pp("neg 2", entry.stk[:])
+			continue
+		}
 		AllocObjects := r.AllocObjects - entry.count.v1
 		AllocBytes := r.AllocBytes - entry.count.v2
 		entry.count.v1 = r.AllocObjects
@@ -60,6 +91,10 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 
 		values[0], values[1] = scaleHeapSample(AllocObjects, AllocBytes, rate)
 		values[2], values[3] = scaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
+
+		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
+			continue
+		}
 		//var blockSize int64
 		//if r.AllocObjects > 0 {
 		//	blockSize = r.AllocBytes / r.AllocObjects
