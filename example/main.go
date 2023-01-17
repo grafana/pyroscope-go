@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pyroscope-io/client/pyroscope"
+	"os"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -48,6 +49,7 @@ func main() {
 		ApplicationName: "simple.golang.app-new",
 		ServerAddress:   "http://localhost:4040", // this will run inside docker-compose, hence `pyroscope` for hostname
 		Logger:          pyroscope.StandardLogger,
+		AuthToken:       os.Getenv("PYROSCOPE_AUTH_TOKEN"),
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileInuseObjects,
