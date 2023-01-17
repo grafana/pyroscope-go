@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/pyroscope-io/client/heap"
+	"github.com/pyroscope-io/client/pyroscope"
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"time"
-
-	"github.com/pyroscope-io/client/pyroscope"
 )
 
 //go:noinline
@@ -46,17 +42,6 @@ func slowFunction(c context.Context, wg *sync.WaitGroup) {
 }
 
 func main() {
-	go func() {
-		hp := heap.DeltaHeapProfiler{}
-		for {
-			buf := bytes.NewBuffer(nil)
-			err := hp.Profile(buf)
-			if err != nil {
-				fmt.Println(err)
-			}
-			time.Sleep(10 * time.Second)
-		}
-	}()
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{

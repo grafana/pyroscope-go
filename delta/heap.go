@@ -1,16 +1,20 @@
-package heap
+package delta
 
 import (
-	"github.com/pyroscope-io/client/heap/internal/pprof"
+	"github.com/pyroscope-io/client/delta/internal/pprof"
 	"io"
 	"runtime"
 )
 
-type DeltaHeapProfiler struct {
+type HeapProfiler struct {
 	impl pprof.DeltaHeapProfiler
 }
 
-func (d *DeltaHeapProfiler) Profile(w io.Writer) error {
+func NewHeapProfiler() HeapProfiler {
+	return HeapProfiler{}
+}
+
+func (d *HeapProfiler) Profile(w io.Writer) error {
 	// Find out how many records there are (MemProfile(nil, true)),
 	// allocate that many records, and get the data.
 	// There's a race—more records might be added between

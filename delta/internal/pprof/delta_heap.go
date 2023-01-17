@@ -5,7 +5,6 @@ import (
 	"math"
 	"runtime"
 	"strings"
-	"unsafe"
 )
 
 type DeltaHeapProfiler struct {
@@ -52,12 +51,12 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 		}
 
 		// do the delta
-		entry := d.m.Lookup(r.Stack(), unsafe.Pointer(uintptr(0)))
+		entry := d.m.Lookup(r.Stack())
 		//todo should we check for negative here
-		AllocObjects := r.AllocObjects - entry.count.AllocObjects
-		AllocBytes := r.AllocBytes - entry.count.AllocBytes
-		entry.count.AllocObjects = r.AllocObjects
-		entry.count.AllocBytes = r.AllocBytes
+		AllocObjects := r.AllocObjects - entry.count.v1
+		AllocBytes := r.AllocBytes - entry.count.v2
+		entry.count.v1 = r.AllocObjects
+		entry.count.v2 = r.AllocBytes
 
 		values[0], values[1] = scaleHeapSample(AllocObjects, AllocBytes, rate)
 		values[2], values[3] = scaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)

@@ -17,8 +17,9 @@ type profMap struct {
 }
 
 type count struct {
-	AllocObjects int64
-	AllocBytes   int64
+	// alloc_objects, alloc_bytes for heap
+	// mutex_count, mutex_duration for mutex
+	v1, v2 int64
 }
 
 // A profMapEntry is a single entry in the profMap.
@@ -26,12 +27,11 @@ type profMapEntry struct {
 	nextHash *profMapEntry // next in hash list
 	nextAll  *profMapEntry // next in list of all entries
 	stk      []uintptr
-	tag      unsafe.Pointer
 	count    count
 }
 
-// todo there are no tags for heap profiles, we could remove it
-func (m *profMap) Lookup(stk []uintptr, tag unsafe.Pointer) *profMapEntry {
+func (m *profMap) Lookup(stk []uintptr) *profMapEntry {
+	tag := uintptr(0) // heap/block profiles has no tags
 	// Compute hash of (stk, tag).
 	h := uintptr(0)
 	for _, x := range stk {
@@ -45,7 +45,8 @@ func (m *profMap) Lookup(stk []uintptr, tag unsafe.Pointer) *profMapEntry {
 	var last *profMapEntry
 Search:
 	for e := m.hash[h]; e != nil; last, e = e, e.nextHash {
-		if len(e.stk) != len(stk) || e.tag != tag {
+		//if len(e.stk) != len(stk) || e.tag != tag {
+		if len(e.stk) != len(stk) {
 			continue
 		}
 		for j := range stk {
@@ -69,7 +70,7 @@ Search:
 	e := &m.free[0]
 	m.free = m.free[1:]
 	e.nextHash = m.hash[h]
-	e.tag = tag
+	//e.tag = tag
 
 	if len(m.freeStk) < len(stk) {
 		m.freeStk = make([]uintptr, 1024)
