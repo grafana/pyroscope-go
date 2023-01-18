@@ -75,8 +75,15 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
 			continue
 		}
-		b.pbSample(values, locs, func() {
 
+		var blockSize int64
+		if r.AllocObjects > 0 {
+			blockSize = r.AllocBytes / r.AllocObjects
+		}
+		b.pbSample(values, locs, func() {
+			if blockSize != 0 {
+				b.pbLabel(tagSample_Label, "bytes", "", blockSize)
+			}
 		})
 	}
 	b.build()
