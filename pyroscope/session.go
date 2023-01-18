@@ -13,6 +13,53 @@ import (
 	"github.com/pyroscope-io/client/upstream"
 )
 
+var (
+	sampleTypeConfigHeap = map[string]*upstream.SampleType{
+		"alloc_objects": {
+			Units:      "objects",
+			Cumulative: false,
+		},
+		"alloc_space": {
+			Units:      "bytes",
+			Cumulative: false,
+		},
+		"inuse_space": {
+			Units:       "bytes",
+			Aggregation: "average",
+			Cumulative:  false,
+		},
+		"inuse_objects": {
+			Units:       "objects",
+			Aggregation: "average",
+			Cumulative:  false,
+		},
+	}
+	sampleTypeConfigMutex = map[string]*upstream.SampleType{
+		"contentions": {
+			DisplayName: "mutex_count",
+			Units:       "lock_samples",
+			Cumulative:  false,
+		},
+		"delay": {
+			DisplayName: "mutex_duration",
+			Units:       "lock_nanoseconds",
+			Cumulative:  false,
+		},
+	}
+	sampleTypeConfigBlock = map[string]*upstream.SampleType{
+		"contentions": {
+			DisplayName: "block_count",
+			Units:       "lock_samples",
+			Cumulative:  false,
+		},
+		"delay": {
+			DisplayName: "block_duration",
+			Units:       "lock_nanoseconds",
+			Cumulative:  false,
+		},
+	}
+)
+
 type Session struct {
 	// configuration, doesn't change
 	upstream               upstream.Upstream
@@ -299,33 +346,14 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 		}
 		curMemBytes := copyBuf(ps.memBuf.Bytes())
 		job := &upstream.UploadJob{
-			Name:       ps.appName,
-			StartTime:  startTime,
-			EndTime:    endTime,
-			SpyName:    "gospy",
-			SampleRate: 100,
-			Format:     upstream.FormatPprof,
-			Profile:    curMemBytes,
-			SampleTypeConfig: map[string]*upstream.SampleType{
-				"alloc_objects": {
-					Units:      "objects",
-					Cumulative: false,
-				},
-				"alloc_space": {
-					Units:      "bytes",
-					Cumulative: false,
-				},
-				"inuse_space": {
-					Units:       "bytes",
-					Aggregation: "average",
-					Cumulative:  false,
-				},
-				"inuse_objects": {
-					Units:       "objects",
-					Aggregation: "average",
-					Cumulative:  false,
-				},
-			},
+			Name:             ps.appName,
+			StartTime:        startTime,
+			EndTime:          endTime,
+			SpyName:          "gospy",
+			SampleRate:       100,
+			Format:           upstream.FormatPprof,
+			Profile:          curMemBytes,
+			SampleTypeConfig: sampleTypeConfigHeap,
 		}
 		ps.upstream.Upload(job)
 		ps.lastGCGeneration = currentGCGeneration
@@ -337,24 +365,13 @@ func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
 	ps.deltaMutex.Profile(ps.mutexBuf)
 	curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
 	job := &upstream.UploadJob{
-		Name:      ps.appName,
-		StartTime: startTime,
-		EndTime:   endTime,
-		SpyName:   "gospy",
-		Format:    upstream.FormatPprof,
-		Profile:   curMutexBuf,
-		SampleTypeConfig: map[string]*upstream.SampleType{
-			"contentions": {
-				DisplayName: "mutex_count",
-				Units:       "lock_samples",
-				Cumulative:  false,
-			},
-			"delay": {
-				DisplayName: "mutex_duration",
-				Units:       "lock_nanoseconds",
-				Cumulative:  false,
-			},
-		},
+		Name:             ps.appName,
+		StartTime:        startTime,
+		EndTime:          endTime,
+		SpyName:          "gospy",
+		Format:           upstream.FormatPprof,
+		Profile:          curMutexBuf,
+		SampleTypeConfig: sampleTypeConfigMutex,
 	}
 	ps.upstream.Upload(job)
 }
@@ -364,24 +381,13 @@ func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
 	ps.deltaBlock.Profile(ps.blockBuf)
 	curBlockBuf := copyBuf(ps.blockBuf.Bytes())
 	job := &upstream.UploadJob{
-		Name:      ps.appName,
-		StartTime: startTime,
-		EndTime:   endTime,
-		SpyName:   "gospy",
-		Format:    upstream.FormatPprof,
-		Profile:   curBlockBuf,
-		SampleTypeConfig: map[string]*upstream.SampleType{
-			"contentions": {
-				DisplayName: "block_count",
-				Units:       "lock_samples",
-				Cumulative:  false,
-			},
-			"delay": {
-				DisplayName: "block_duration",
-				Units:       "lock_nanoseconds",
-				Cumulative:  false,
-			},
-		},
+		Name:             ps.appName,
+		StartTime:        startTime,
+		EndTime:          endTime,
+		SpyName:          "gospy",
+		Format:           upstream.FormatPprof,
+		Profile:          curBlockBuf,
+		SampleTypeConfig: sampleTypeConfigBlock,
 	}
 	ps.upstream.Upload(job)
 }
