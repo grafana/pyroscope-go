@@ -32,7 +32,6 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 		}
 	}
 
-	//todo is it needed? use generics when available
 	sort.Slice(p, func(i, j int) bool { return p[i].Cycles > p[j].Cycles })
 
 	return d.impl.PrintCountCycleProfile(w, "contentions", "delay", d.scaleProfile, p)
