@@ -1,3 +1,5 @@
+//go:build go1.16 && !go1.21
+
 package pprof
 
 import _ "unsafe"
