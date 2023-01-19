@@ -100,7 +100,8 @@ type SessionConfig struct {
 	ProfilingTypes         []ProfileType
 	DisableGCRuns          bool
 	DisableAutomaticResets bool
-	DisableCumulativeMerge bool // deprecated and not used, does nothing
+	// Deprecated: the field is ignored and does nothing
+	DisableCumulativeMerge bool
 	SampleRate             uint32
 	UploadRate             time.Duration
 }
