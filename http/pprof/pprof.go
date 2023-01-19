@@ -18,9 +18,9 @@ type deltaProfiler interface {
 }
 
 func init() {
-	http.HandleFunc("/debug/pprof/pyroscope_heap", Heap)
-	http.HandleFunc("/debug/pprof/pyroscope_block", Block)
-	http.HandleFunc("/debug/pprof/pyroscope_mutex", Mutex)
+	http.HandleFunc("/debug/pprof/delta_heap", Heap)
+	http.HandleFunc("/debug/pprof/delta_block", Block)
+	http.HandleFunc("/debug/pprof/delta_mutex", Mutex)
 }
 
 func Heap(w http.ResponseWriter, r *http.Request) {
