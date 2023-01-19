@@ -67,7 +67,6 @@ type Session struct {
 	profileTypes           []ProfileType
 	uploadRate             time.Duration
 	disableGCRuns          bool
-	disableCumulativeMerge bool
 	DisableAutomaticResets bool
 
 	logger    Logger
@@ -101,7 +100,6 @@ type SessionConfig struct {
 	ProfilingTypes         []ProfileType
 	DisableGCRuns          bool
 	DisableAutomaticResets bool
-	DisableCumulativeMerge bool
 	SampleRate             uint32
 	UploadRate             time.Duration
 }
@@ -123,7 +121,6 @@ func NewSession(c SessionConfig) (*Session, error) {
 		profileTypes:           c.ProfilingTypes,
 		disableGCRuns:          c.DisableGCRuns,
 		DisableAutomaticResets: c.DisableAutomaticResets,
-		disableCumulativeMerge: c.DisableCumulativeMerge,
 		sampleRate:             c.SampleRate,
 		uploadRate:             c.UploadRate,
 		stopCh:                 make(chan struct{}),
