@@ -2,8 +2,8 @@ package pyroscope
 
 import (
 	"bytes"
-	"github.com/pyroscope-io/client/delta"
 	"github.com/pyroscope-io/client/internal/alignedticker"
+	"github.com/pyroscope-io/godeltaprof"
 	"runtime"
 	"runtime/pprof"
 	"sync"
@@ -90,9 +90,9 @@ type Session struct {
 	appName          string
 	startTime        time.Time
 
-	deltaBlock delta.BlockProfiler
-	deltaMutex delta.BlockProfiler
-	deltaHeap  delta.HeapProfiler
+	deltaBlock godeltaprof.BlockProfiler
+	deltaMutex godeltaprof.BlockProfiler
+	deltaHeap  godeltaprof.HeapProfiler
 }
 
 type SessionConfig struct {
@@ -137,9 +137,9 @@ func NewSession(c SessionConfig) (*Session, error) {
 		mutexBuf:               &bytes.Buffer{},
 		blockBuf:               &bytes.Buffer{},
 
-		deltaBlock: delta.NewBlockProfiler(),
-		deltaMutex: delta.NewMutexProfiler(),
-		deltaHeap:  delta.NewHeapProfiler(),
+		deltaBlock: godeltaprof.NewBlockProfiler(),
+		deltaMutex: godeltaprof.NewMutexProfiler(),
+		deltaHeap:  godeltaprof.NewHeapProfiler(),
 	}
 	return ps, nil
 }
