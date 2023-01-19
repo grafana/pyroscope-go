@@ -82,9 +82,7 @@ type Session struct {
 
 	goroutinesBuf *bytes.Buffer
 	mutexBuf      *bytes.Buffer
-	//mutexPrevBytes []byte
-	blockBuf *bytes.Buffer
-	//blockPrevBytes []byte
+	blockBuf      *bytes.Buffer
 
 	lastGCGeneration uint32
 	appName          string
