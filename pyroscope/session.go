@@ -87,9 +87,9 @@ type Session struct {
 	appName          string
 	startTime        time.Time
 
-	deltaBlock godeltaprof.BlockProfiler
-	deltaMutex godeltaprof.BlockProfiler
-	deltaHeap  godeltaprof.HeapProfiler
+	deltaBlock *godeltaprof.BlockProfiler
+	deltaMutex *godeltaprof.BlockProfiler
+	deltaHeap  *godeltaprof.HeapProfiler
 }
 
 type SessionConfig struct {
