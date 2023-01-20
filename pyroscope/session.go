@@ -5,6 +5,7 @@ import (
 	"github.com/pyroscope-io/client/internal/alignedticker"
 	"github.com/pyroscope-io/client/internal/cumulativepprof"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"sync"
 	"time"
@@ -368,6 +369,11 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 }
 
 func (ps *Session) mergeCumulativeProfile(m *cumulativepprof.Merger, job *upstream.UploadJob) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("mergeCumulativeProfile panic %s", string(debug.Stack()))
+		}
+	}()
 	// todo should we filter by enabled ps.profileTypes to reduce profile size ? maybe add a separate option ?
 	if ps.disableCumulativeMerge {
 		return
