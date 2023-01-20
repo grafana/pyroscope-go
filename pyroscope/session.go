@@ -404,6 +404,7 @@ func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
 	ps.upstream.Upload(job)
 }
 
+
 func (ps *Session) Stop() {
 	ps.trieMutex.Lock()
 	defer ps.trieMutex.Unlock()
