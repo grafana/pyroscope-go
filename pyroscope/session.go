@@ -5,6 +5,7 @@ import (
 	"github.com/pyroscope-io/client/internal/alignedticker"
 	"github.com/pyroscope-io/godeltaprof"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"sync"
 	"time"
@@ -319,13 +320,17 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 	if ps.isMutexEnabled() {
 		ps.dumpMutexProfile(startTime, endTime)
 	}
-
 	if ps.isMemEnabled() {
 		ps.dumpHeapProfile(startTime, endTime)
 	}
 }
 
 func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump heap profiler panic %s", string(debug.Stack()))
+		}
+	}()
 	currentGCGeneration := numGC()
 	// sometimes GC doesn't run within 10 seconds
 	//   in such cases we force a GC run
@@ -358,6 +363,11 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 }
 
 func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump mutex profiler panic %s", string(debug.Stack()))
+		}
+	}()
 	ps.mutexBuf.Reset()
 	ps.deltaMutex.Profile(ps.mutexBuf)
 	curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
@@ -374,6 +384,11 @@ func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
 }
 
 func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump block profiler panic %s", string(debug.Stack()))
+		}
+	}()
 	ps.blockBuf.Reset()
 	ps.deltaBlock.Profile(ps.blockBuf)
 	curBlockBuf := copyBuf(ps.blockBuf.Bytes())
