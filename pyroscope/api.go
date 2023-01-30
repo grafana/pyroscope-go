@@ -83,7 +83,7 @@ func Start(cfg Config) (*Profiler, error) {
 		return nil, fmt.Errorf("new session: %w", err)
 	}
 	uploader.Start()
-	if err = s.start(); err != nil {
+	if err = s.Start(); err != nil {
 		return nil, fmt.Errorf("start session: %w", err)
 	}
 
