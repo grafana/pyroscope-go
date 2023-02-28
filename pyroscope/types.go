@@ -23,6 +23,7 @@ const (
 	ProfileBlockCount    ProfileType = "block_count"
 	ProfileBlockDuration ProfileType = "block_duration"
 	DefaultSampleRate                = 100
+	DefaultUploadRate                = 10
 )
 
 var DefaultProfileTypes = []ProfileType{
