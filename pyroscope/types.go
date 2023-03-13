@@ -1,5 +1,7 @@
 package pyroscope
 
+import "time"
+
 type ProfileType string
 
 // Logger is an interface that library users can use
@@ -23,7 +25,7 @@ const (
 	ProfileBlockCount    ProfileType = "block_count"
 	ProfileBlockDuration ProfileType = "block_duration"
 	DefaultSampleRate                = 100
-	DefaultUploadRate                = 10
+	DefaultUploadRate                = time.Second * 10
 )
 
 var DefaultProfileTypes = []ProfileType{

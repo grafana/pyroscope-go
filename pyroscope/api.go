@@ -22,7 +22,7 @@ type Config struct {
 	DisableAutomaticResets bool // disable automatic profiler reset every 10 seconds. Reset manually by calling Flush method
 	// Deprecated: the field is ignored and does nothing
 	DisableCumulativeMerge bool
-	UploadRate             uint8 // data upload frequency: every 10 seconds by default
+	UploadRate             time.Duration // data upload frequency: every 10 seconds by default
 }
 
 type Profiler struct {
@@ -72,7 +72,7 @@ func Start(cfg Config) (*Profiler, error) {
 		DisableGCRuns:          cfg.DisableGCRuns,
 		DisableAutomaticResets: cfg.DisableAutomaticResets,
 		SampleRate:             cfg.SampleRate,
-		UploadRate:             time.Duration(cfg.UploadRate) * time.Second,
+		UploadRate:             cfg.UploadRate,
 	}
 
 	cfg.Logger.Infof("starting profiling session:")
