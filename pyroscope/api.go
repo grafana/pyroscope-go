@@ -63,9 +63,6 @@ func Start(cfg Config) (*Profiler, error) {
 	if cfg.UploadRate == 0 {
 		// For backward compatibility.
 		cfg.UploadRate = 10 * time.Second
-	} else if cfg.UploadRate <= 5*time.Second {
-		// The minimum upload rate is 5 seconds.
-		cfg.UploadRate = 5 * time.Second
 	}
 
 	sc := SessionConfig{
