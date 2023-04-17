@@ -39,6 +39,7 @@ type Remote struct {
 
 type Config struct {
 	AuthToken string
+	ScopeOrgID string
 	Threads   int
 	Address   string
 	Timeout   time.Duration
@@ -163,7 +164,7 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	q.Set("units", j.Units)
 	q.Set("aggregationType", j.AggregationType)
 
-	u.Path = path.Join(u.Path, "/ingest")
+	u.Path = path.Join(u.Path, "ingest")
 	u.RawQuery = q.Encode()
 
 	r.logger.Debugf("uploading at %s", u.String())
@@ -179,6 +180,9 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 
 	if r.cfg.AuthToken != "" {
 		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
+	}
+	if r.cfg.ScopeOrgID != "" {
+		request.Header.Set("X-Scope-OrgID", r.cfg.ScopeOrgID)
 	}
 
 	// do the request and get the response
