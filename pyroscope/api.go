@@ -24,6 +24,7 @@ type Config struct {
 	DisableAutomaticResets bool // disable automatic profiler reset every 10 seconds. Reset manually by calling Flush method
 	// Deprecated: the field is ignored and does nothing
 	DisableCumulativeMerge bool
+	HTTPHeaders            map[string]string
 }
 
 type Profiler struct {
@@ -50,12 +51,13 @@ func Start(cfg Config) (*Profiler, error) {
 	}
 
 	rc := remote.Config{
-		AuthToken:  cfg.AuthToken,
-		ScopeOrgID: cfg.ScopeOrgID,
-		Address:    cfg.ServerAddress,
-		Threads:    5, // per each profile type upload
-		Timeout:    30 * time.Second,
-		Logger:     cfg.Logger,
+		AuthToken:   cfg.AuthToken,
+		ScopeOrgID:  cfg.ScopeOrgID,
+		HTTPHeaders: cfg.HTTPHeaders,
+		Address:     cfg.ServerAddress,
+		Threads:     5, // per each profile type upload
+		Timeout:     30 * time.Second,
+		Logger:      cfg.Logger,
 	}
 	uploader, err := remote.NewRemote(rc)
 	if err != nil {

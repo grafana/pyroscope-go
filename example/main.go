@@ -63,6 +63,7 @@ func main() {
 			pyroscope.ProfileBlockCount,
 			pyroscope.ProfileBlockDuration,
 		},
+		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {

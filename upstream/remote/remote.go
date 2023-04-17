@@ -38,12 +38,13 @@ type Remote struct {
 }
 
 type Config struct {
-	AuthToken string
-	ScopeOrgID string
-	Threads   int
-	Address   string
-	Timeout   time.Duration
-	Logger    Logger
+	AuthToken    string
+	ScopeOrgID  string
+	HTTPHeaders map[string]string
+	Threads     int
+	Address      string
+	Timeout      time.Duration
+	Logger       Logger
 }
 
 type Logger interface {
@@ -183,6 +184,9 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	}
 	if r.cfg.ScopeOrgID != "" {
 		request.Header.Set("X-Scope-OrgID", r.cfg.ScopeOrgID)
+	}
+	for k, v := range r.cfg.HTTPHeaders {
+		request.Header.Set(k, v)
 	}
 
 	// do the request and get the response
