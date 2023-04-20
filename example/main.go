@@ -46,11 +46,13 @@ func main() {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{
-		ApplicationName: "simple.golang.app-new",
-		ServerAddress:   "http://gouser:gopass@localhost:4040/",
-		Logger:          pyroscope.StandardLogger,
-		AuthToken:       os.Getenv("PYROSCOPE_AUTH_TOKEN"),
-		ScopeOrgID:      os.Getenv("PYROSCOPE_SCOPE_ORGID"),
+		ApplicationName:   "simple.golang.app-new",
+		ServerAddress:     "http://gouser:gopass@localhost:4040/",
+		Logger:            pyroscope.StandardLogger,
+		AuthToken:         os.Getenv("PYROSCOPE_AUTH_TOKEN"),
+		ScopeOrgID:        os.Getenv("PYROSCOPE_SCOPE_ORGID"),
+		BasicAuthUser:     os.Getenv("PYROSCOPE_BASIC_AUTH_USER"),
+		BasicAuthPassword: os.Getenv("PYROSCOPE_BASIC_AUTH_PASSWORD"),
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileInuseObjects,
