@@ -47,7 +47,7 @@ func main() {
 	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{
 		ApplicationName:   "simple.golang.app-new",
-		ServerAddress:     "http://gouser:gopass@localhost:4040/",
+		ServerAddress:     "http://localhost:4040",
 		Logger:            pyroscope.StandardLogger,
 		AuthToken:         os.Getenv("PYROSCOPE_AUTH_TOKEN"),
 		ScopeOrgID:        os.Getenv("PYROSCOPE_SCOPE_ORGID"),
