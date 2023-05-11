@@ -41,7 +41,7 @@ type Config struct {
 	AuthToken         string
 	BasicAuthUser     string // http basic auth user
 	BasicAuthPassword string // http basic auth password
-	ScopeOrgID        string
+	TenantID          string
 	HTTPHeaders       map[string]string
 	Threads           int
 	Address           string
@@ -186,8 +186,8 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	} else if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
 	}
-	if r.cfg.ScopeOrgID != "" {
-		request.Header.Set("X-Scope-OrgID", r.cfg.ScopeOrgID)
+	if r.cfg.TenantID != "" {
+		request.Header.Set("X-Scope-OrgID", r.cfg.TenantID)
 	}
 	for k, v := range r.cfg.HTTPHeaders {
 		request.Header.Set(k, v)

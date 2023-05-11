@@ -17,7 +17,7 @@ type Config struct {
 	AuthToken              string // specify this token when using pyroscope cloud
 	BasicAuthUser          string // http basic auth user
 	BasicAuthPassword      string // http basic auth password
-	ScopeOrgID             string // specify OrgID when using phlare multi-tenancy
+	TenantID               string // specify TenantId when using phlare multi-tenancy
 	SampleRate             uint32 // todo this one is not used
 	UploadRate             time.Duration
 	Logger                 Logger
@@ -54,7 +54,7 @@ func Start(cfg Config) (*Profiler, error) {
 
 	rc := remote.Config{
 		AuthToken:         cfg.AuthToken,
-		ScopeOrgID:        cfg.ScopeOrgID,
+		TenantID:          cfg.TenantID,
 		BasicAuthUser:     cfg.BasicAuthUser,
 		BasicAuthPassword: cfg.BasicAuthPassword,
 		HTTPHeaders:       cfg.HTTPHeaders,
