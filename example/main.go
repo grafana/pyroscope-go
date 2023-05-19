@@ -46,10 +46,13 @@ func main() {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
 	pyroscope.Start(pyroscope.Config{
-		ApplicationName: "simple.golang.app-new",
-		ServerAddress:   "http://localhost:4040", // this will run inside docker-compose, hence `pyroscope` for hostname
-		Logger:          pyroscope.StandardLogger,
-		AuthToken:       os.Getenv("PYROSCOPE_AUTH_TOKEN"),
+		ApplicationName:   "simple.golang.app-new",
+		ServerAddress:     "http://localhost:4040",
+		Logger:            pyroscope.StandardLogger,
+		AuthToken:         os.Getenv("PYROSCOPE_AUTH_TOKEN"),
+		TenantID:          os.Getenv("PYROSCOPE_TENANT_ID"),
+		BasicAuthUser:     os.Getenv("PYROSCOPE_BASIC_AUTH_USER"),
+		BasicAuthPassword: os.Getenv("PYROSCOPE_BASIC_AUTH_PASSWORD"),
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileInuseObjects,
@@ -62,6 +65,7 @@ func main() {
 			pyroscope.ProfileBlockCount,
 			pyroscope.ProfileBlockDuration,
 		},
+		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {
