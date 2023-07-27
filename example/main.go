@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/pprof"
 
 	"github.com/pyroscope-io/client/pyroscope"
@@ -31,10 +32,15 @@ func slowFunction(c context.Context) {
 }
 
 func main() {
+	sa := os.Getenv("SERVER_ADDRESS")
+	if sa == "" {
+		sa = "https://localhost:4317"
+	}
 	pyroscope.Start(pyroscope.Config{
-		ApplicationName: "simple.golang.app-new",
-		ServerAddress:   "http://localhost:4040", // this will run inside docker-compose, hence `pyroscope` for hostname
+		ApplicationName: "go-test",
+		ServerAddress:   sa,
 		Logger:          pyroscope.StandardLogger,
+		UseOTLP:         true,
 	})
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {

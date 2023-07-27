@@ -17,6 +17,7 @@ type Config struct {
 	Logger          Logger
 	ProfileTypes    []ProfileType
 	DisableGCRuns   bool // this will disable automatic runtime.GC runs between getting the heap profiles
+	UseOTLP         bool
 }
 
 type Profiler struct {
@@ -48,7 +49,7 @@ func Start(cfg Config) (*Profiler, error) {
 		threads:   4,
 		timeout:   30 * time.Second,
 	}
-	uploader, err := newRemote(rc, cfg.Logger)
+	uploader, err := newRemote(rc, cfg.Logger, cfg.UseOTLP)
 	if err != nil {
 		return nil, err
 	}

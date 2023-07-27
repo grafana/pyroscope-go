@@ -2,6 +2,7 @@ package pyroscope
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/collector/pdata/pprofile"
+	"go.opentelemetry.io/collector/pdata/pprofile/pprofileotlp"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type uploadFormat string
@@ -40,10 +47,11 @@ var (
 const cloudHostnameSuffix = "pyroscope.cloud"
 
 type remote struct {
-	cfg    remoteConfig
-	jobs   chan *uploadJob
-	client *http.Client
-	Logger Logger
+	cfg     remoteConfig
+	jobs    chan *uploadJob
+	client  *http.Client
+	Logger  Logger
+	useOTLP bool
 
 	done chan struct{}
 	wg   sync.WaitGroup
@@ -56,7 +64,7 @@ type remoteConfig struct {
 	timeout   time.Duration
 }
 
-func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
+func newRemote(cfg remoteConfig, logger Logger, useOTLP bool) (*remote, error) {
 	r := &remote{
 		cfg:  cfg,
 		jobs: make(chan *uploadJob, 20),
@@ -74,8 +82,9 @@ func newRemote(cfg remoteConfig, logger Logger) (*remote, error) {
 			},
 			Timeout: cfg.timeout,
 		},
-		Logger: logger,
-		done:   make(chan struct{}),
+		Logger:  logger,
+		useOTLP: useOTLP,
+		done:    make(chan struct{}),
 	}
 
 	// parse the upstream address
@@ -169,6 +178,24 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 		request.Header.Set("Authorization", "Bearer "+r.cfg.authToken)
 	}
 
+	if r.useOTLP {
+		// TODO: reuse connection
+		cc, err := grpc.Dial(u.Host,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock())
+		if err != nil {
+			return err
+		}
+		oprof := pprofile.PprofToOprof(j.Profile, "arrays")
+		er := pprofileotlp.NewExportRequestFromProfiles(oprof)
+
+		var header metadata.MD
+		client := pprofileotlp.NewGRPCClient(cc)
+
+		_, err = client.Export(context.Background(), er, grpc.Header(&header))
+		return err
+	}
+
 	// do the request and get the response
 	response, err := r.client.Do(request)
 	if err != nil {
@@ -210,7 +237,7 @@ func requiresAuthToken(u *url.URL) bool {
 func (r *remote) safeUpload(job *uploadJob) {
 	defer func() {
 		if catch := recover(); catch != nil {
-			r.Logger.Errorf("recover stack: %v", debug.Stack())
+			r.Logger.Errorf("recover stack: %v", string(debug.Stack()))
 		}
 	}()
 
