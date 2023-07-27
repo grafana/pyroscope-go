@@ -1,8 +1,9 @@
-package pyroscope
+package remote
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pyroscope-io/client/upstream"
 	"go.opentelemetry.io/collector/pdata/pprofile"
 	"go.opentelemetry.io/collector/pdata/pprofile/pprofileotlp"
 	"google.golang.org/grpc"
@@ -23,94 +25,88 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type uploadFormat string
-
-const pprofFormat uploadFormat = "pprof"
-
-type uploadJob struct {
-	Name            string
-	StartTime       time.Time
-	EndTime         time.Time
-	SpyName         string
-	SampleRate      uint32
-	Units           string
-	AggregationType string
-	Format          uploadFormat
-	Profile         []byte
-	PrevProfile     []byte
-}
-
 var (
 	errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
 )
 
 const cloudHostnameSuffix = "pyroscope.cloud"
 
-type remote struct {
-	cfg     remoteConfig
-	jobs    chan *uploadJob
+type Remote struct {
+	cfg     Config
+	jobs    chan *upstream.UploadJob
 	client  *http.Client
-	Logger  Logger
+	logger  Logger
 	useOTLP bool
 
 	done chan struct{}
 	wg   sync.WaitGroup
+
+	flushWG sync.WaitGroup
 }
 
-type remoteConfig struct {
-	authToken string
-	threads   int
-	address   string
-	timeout   time.Duration
+type Config struct {
+	AuthToken         string
+	BasicAuthUser     string // http basic auth user
+	BasicAuthPassword string // http basic auth password
+	TenantID          string
+	HTTPHeaders       map[string]string
+	Threads           int
+	Address           string
+	Timeout           time.Duration
+	Logger            Logger
 }
 
-func newRemote(cfg remoteConfig, logger Logger, useOTLP bool) (*remote, error) {
-	r := &remote{
+type Logger interface {
+	Infof(_ string, _ ...interface{})
+	Debugf(_ string, _ ...interface{})
+	Errorf(_ string, _ ...interface{})
+}
+
+func NewRemote(cfg Config, useOTLP bool) (*Remote, error) {
+	r := &Remote{
 		cfg:  cfg,
-		jobs: make(chan *uploadJob, 20),
+		jobs: make(chan *upstream.UploadJob, 20),
 		client: &http.Client{
 			Transport: &http.Transport{
-				MaxConnsPerHost: cfg.threads,
+				MaxConnsPerHost: cfg.Threads,
 			},
 			// Don't follow redirects
 			// Since the go http client strips the Authorization header when doing redirects (eg http -> https)
 			// https://github.com/golang/go/blob/a41763539c7ad09a22720a517a28e6018ca4db0f/src/net/http/client_test.go#L1764
-			// that makes the an authorized return a 401
+			// making an authorized server return a 401
 			// which is confusing since the user most likely already set up an API Key
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
-			Timeout: cfg.timeout,
+			Timeout: cfg.Timeout,
 		},
-		Logger:  logger,
+		logger:  cfg.Logger,
 		useOTLP: useOTLP,
 		done:    make(chan struct{}),
 	}
 
 	// parse the upstream address
-	u, err := url.Parse(cfg.address)
+	u, err := url.Parse(cfg.Address)
 	if err != nil {
 		return nil, err
 	}
 
 	// authorize the token first
-	if cfg.authToken == "" && requiresAuthToken(u) {
+	if cfg.AuthToken == "" && requiresAuthToken(u) {
 		return nil, errCloudTokenRequired
 	}
 
-	// start goroutines for uploading profile data
-	r.Start()
 	return r, nil
 }
 
-func (r *remote) Start() {
-	r.wg.Add(r.cfg.threads)
-	for i := 0; i < r.cfg.threads; i++ {
+func (r *Remote) Start() {
+	r.wg.Add(r.cfg.Threads)
+	for i := 0; i < r.cfg.Threads; i++ {
 		go r.handleJobs()
 	}
 }
 
-func (r *remote) Stop() {
+func (r *Remote) Stop() {
 	if r.done != nil {
 		close(r.done)
 	}
@@ -119,16 +115,24 @@ func (r *remote) Stop() {
 	r.wg.Wait()
 }
 
-func (r *remote) upload(job *uploadJob) {
+func (r *Remote) Upload(j *upstream.UploadJob) {
+	r.flushWG.Add(1)
 	select {
-	case r.jobs <- job:
+	case r.jobs <- j:
 	default:
-		r.Logger.Errorf("remote upload queue is full, dropping a profile job")
+		r.flushWG.Done()
+		r.logger.Errorf("remote upload queue is full, dropping a profile job")
 	}
 }
+func (r *Remote) Flush() {
+	if r.done == nil {
+		return
+	}
+	r.flushWG.Wait()
+}
 
-func (r *remote) uploadProfile(j *uploadJob) error {
-	u, err := url.Parse(r.cfg.address)
+func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
+	u, err := url.Parse(r.cfg.Address)
 	if err != nil {
 		return fmt.Errorf("url parse: %v", err)
 	}
@@ -148,6 +152,17 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 			return err
 		}
 	}
+	if j.SampleTypeConfig != nil {
+		fw, err = writer.CreateFormFile("sample_type_config", "sample_type_config.json")
+		if err != nil {
+			return err
+		}
+		b, err := json.Marshal(j.SampleTypeConfig)
+		if err != nil {
+			return err
+		}
+		fw.Write(b)
+	}
 	writer.Close()
 
 	q := u.Query()
@@ -160,22 +175,30 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 	q.Set("units", j.Units)
 	q.Set("aggregationType", j.AggregationType)
 
-	u.Path = path.Join(u.Path, "/ingest")
+	u.Path = path.Join(u.Path, "ingest")
 	u.RawQuery = q.Encode()
 
-	r.Logger.Debugf("uploading at %s", u.String())
+	r.logger.Debugf("uploading at %s", u.String())
 	// new a request for the job
 	request, err := http.NewRequest("POST", u.String(), body)
 	if err != nil {
 		return fmt.Errorf("new http request: %v", err)
 	}
 	contentType := writer.FormDataContentType()
-	r.Logger.Debugf("content type: %s", contentType)
+	r.logger.Debugf("content type: %s", contentType)
 	request.Header.Set("Content-Type", contentType)
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
-	if r.cfg.authToken != "" {
-		request.Header.Set("Authorization", "Bearer "+r.cfg.authToken)
+	if r.cfg.AuthToken != "" {
+		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
+	} else if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
+		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
+	}
+	if r.cfg.TenantID != "" {
+		request.Header.Set("X-Scope-OrgID", r.cfg.TenantID)
+	}
+	for k, v := range r.cfg.HTTPHeaders {
+		request.Header.Set(k, v)
 	}
 
 	if r.useOTLP {
@@ -217,7 +240,7 @@ func (r *remote) uploadProfile(j *uploadJob) error {
 }
 
 // handle the jobs
-func (r *remote) handleJobs() {
+func (r *Remote) handleJobs() {
 	for {
 		select {
 		case <-r.done:
@@ -225,6 +248,7 @@ func (r *remote) handleJobs() {
 			return
 		case job := <-r.jobs:
 			r.safeUpload(job)
+			r.flushWG.Done()
 		}
 	}
 }
@@ -234,15 +258,15 @@ func requiresAuthToken(u *url.URL) bool {
 }
 
 // do safe upload
-func (r *remote) safeUpload(job *uploadJob) {
+func (r *Remote) safeUpload(job *upstream.UploadJob) {
 	defer func() {
 		if catch := recover(); catch != nil {
-			r.Logger.Errorf("recover stack: %v", string(debug.Stack()))
+			r.logger.Errorf("recover stack: %v: %v", catch, string(debug.Stack()))
 		}
 	}()
 
 	// update the profile data to server
 	if err := r.uploadProfile(job); err != nil {
-		r.Logger.Errorf("upload profile: %v", err)
+		r.logger.Errorf("upload profile: %v", err)
 	}
 }

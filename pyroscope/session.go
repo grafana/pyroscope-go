@@ -2,68 +2,143 @@ package pyroscope
 
 import (
 	"bytes"
+	"github.com/pyroscope-io/client/internal/alignedticker"
+	"github.com/pyroscope-io/godeltaprof"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"sync"
 	"time"
 
 	"github.com/pyroscope-io/client/internal/flameql"
+	"github.com/pyroscope-io/client/upstream"
 )
 
-type session struct {
+var (
+	sampleTypeConfigHeap = map[string]*upstream.SampleType{
+		"alloc_objects": {
+			Units:      "objects",
+			Cumulative: false,
+		},
+		"alloc_space": {
+			Units:      "bytes",
+			Cumulative: false,
+		},
+		"inuse_space": {
+			Units:       "bytes",
+			Aggregation: "average",
+			Cumulative:  false,
+		},
+		"inuse_objects": {
+			Units:       "objects",
+			Aggregation: "average",
+			Cumulative:  false,
+		},
+	}
+	sampleTypeConfigMutex = map[string]*upstream.SampleType{
+		"contentions": {
+			DisplayName: "mutex_count",
+			Units:       "lock_samples",
+			Cumulative:  false,
+		},
+		"delay": {
+			DisplayName: "mutex_duration",
+			Units:       "lock_nanoseconds",
+			Cumulative:  false,
+		},
+	}
+	sampleTypeConfigBlock = map[string]*upstream.SampleType{
+		"contentions": {
+			DisplayName: "block_count",
+			Units:       "lock_samples",
+			Cumulative:  false,
+		},
+		"delay": {
+			DisplayName: "block_duration",
+			Units:       "lock_nanoseconds",
+			Cumulative:  false,
+		},
+	}
+)
+
+type Session struct {
 	// configuration, doesn't change
-	upstream      *remote
-	sampleRate    uint32
-	profileTypes  []ProfileType
-	uploadRate    time.Duration
-	disableGCRuns bool
-	pid           int
+	upstream               upstream.Upstream
+	sampleRate             uint32
+	profileTypes           []ProfileType
+	uploadRate             time.Duration
+	disableGCRuns          bool
+	DisableAutomaticResets bool
 
 	logger    Logger
 	stopOnce  sync.Once
 	stopCh    chan struct{}
+	flushCh   chan *flush
 	trieMutex sync.Mutex
 
 	// these things do change:
-	cpuBuf       *bytes.Buffer
-	memBuf       *bytes.Buffer
-	memPrevBytes []byte
+	cpuBuf *bytes.Buffer
+	memBuf *bytes.Buffer
+
+	goroutinesBuf *bytes.Buffer
+	mutexBuf      *bytes.Buffer
+	blockBuf      *bytes.Buffer
 
 	lastGCGeneration uint32
 	appName          string
 	startTime        time.Time
+
+	deltaBlock *godeltaprof.BlockProfiler
+	deltaMutex *godeltaprof.BlockProfiler
+	deltaHeap  *godeltaprof.HeapProfiler
 }
 
-type sessionConfig struct {
-	upstream       *remote
-	logger         Logger
-	appName        string
-	tags           map[string]string
-	profilingTypes []ProfileType
-	disableGCRuns  bool
-	sampleRate     uint32
-	uploadRate     time.Duration
+type SessionConfig struct {
+	Upstream               upstream.Upstream
+	Logger                 Logger
+	AppName                string
+	Tags                   map[string]string
+	ProfilingTypes         []ProfileType
+	DisableGCRuns          bool
+	DisableAutomaticResets bool
+	// Deprecated: the field is ignored and does nothing
+	DisableCumulativeMerge bool
+	SampleRate             uint32
+	UploadRate             time.Duration
 }
 
-func newSession(c sessionConfig) (*session, error) {
-	appName, err := mergeTagsWithAppName(c.appName, c.tags)
+type flush struct {
+	wg   sync.WaitGroup
+	wait bool
+}
+
+func NewSession(c SessionConfig) (*Session, error) {
+	appName, err := mergeTagsWithAppName(c.AppName, c.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	ps := &session{
-		upstream:      c.upstream,
-		appName:       appName,
-		profileTypes:  c.profilingTypes,
-		disableGCRuns: c.disableGCRuns,
-		sampleRate:    c.sampleRate,
-		uploadRate:    c.uploadRate,
-		stopCh:        make(chan struct{}),
-		logger:        c.logger,
-		cpuBuf:        &bytes.Buffer{},
-		memBuf:        &bytes.Buffer{},
-	}
+	ps := &Session{
+		upstream:               c.Upstream,
+		appName:                appName,
+		profileTypes:           c.ProfilingTypes,
+		disableGCRuns:          c.DisableGCRuns,
+		DisableAutomaticResets: c.DisableAutomaticResets,
+		sampleRate:             c.SampleRate,
+		uploadRate:             c.UploadRate,
+		stopCh:                 make(chan struct{}),
+		flushCh:                make(chan *flush),
+		logger:                 c.Logger,
+		cpuBuf:                 &bytes.Buffer{},
+		memBuf:                 &bytes.Buffer{},
+		goroutinesBuf:          &bytes.Buffer{},
+		mutexBuf:               &bytes.Buffer{},
+		blockBuf:               &bytes.Buffer{},
 
+		deltaBlock: godeltaprof.NewBlockProfiler(),
+		deltaMutex: godeltaprof.NewMutexProfiler(),
+		deltaHeap:  godeltaprof.NewHeapProfiler(),
+	}
 	return ps, nil
 }
 
@@ -95,15 +170,24 @@ func mergeTagsWithAppName(appName string, tags map[string]string) (string, error
 }
 
 // revive:disable-next-line:cognitive-complexity complexity is fine
-func (ps *session) takeSnapshots() {
-	ticker := time.NewTicker(time.Second / time.Duration(ps.sampleRate))
-	defer ticker.Stop()
+func (ps *Session) takeSnapshots() {
+	var automaticResetTicker <-chan time.Time
+	if ps.DisableAutomaticResets {
+		automaticResetTicker = make(chan time.Time)
+	} else {
+		t := alignedticker.NewAlignedTicker(ps.uploadRate)
+		automaticResetTicker = t.C
+		defer t.Stop()
+	}
 	for {
 		select {
-		case <-ticker.C:
-			if ps.isDueForReset() {
-				ps.reset()
-			}
+		case endTime := <-automaticResetTicker:
+			ps.reset(ps.startTime, endTime)
+		case f := <-ps.flushCh:
+			ps.reset(ps.startTime, ps.truncatedTime())
+			ps.upstream.Flush()
+			f.wg.Done()
+			break
 		case <-ps.stopCh:
 			return
 		}
@@ -116,22 +200,15 @@ func copyBuf(b []byte) []byte {
 	return r
 }
 
-func (ps *session) Start() error {
-	ps.reset()
+func (ps *Session) Start() error {
+	t := ps.truncatedTime()
+	ps.reset(t, t)
 
 	go ps.takeSnapshots()
 	return nil
 }
 
-func (ps *session) isDueForReset() bool {
-	// TODO: duration should be either taken from config or ideally passed from server
-	now := time.Now().Truncate(ps.uploadRate)
-	start := ps.startTime.Truncate(ps.uploadRate)
-
-	return !start.Equal(now)
-}
-
-func (ps *session) isCPUEnabled() bool {
+func (ps *Session) isCPUEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileCPU {
 			return true
@@ -140,7 +217,7 @@ func (ps *session) isCPUEnabled() bool {
 	return false
 }
 
-func (ps *session) isMemEnabled() bool {
+func (ps *Session) isMemEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileInuseObjects || t == ProfileAllocObjects || t == ProfileInuseSpace || t == ProfileAllocSpace {
 			return true
@@ -149,29 +226,56 @@ func (ps *session) isMemEnabled() bool {
 	return false
 }
 
-func (ps *session) reset() {
-	now := time.Now()
-	endTime := now.Truncate(ps.uploadRate)
-	startTime := endTime.Add(-ps.uploadRate)
+func (ps *Session) isBlockEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileBlockCount || t == ProfileBlockDuration {
+			return true
+		}
+	}
+	return false
+}
+
+func (ps *Session) isMutexEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileMutexCount || t == ProfileMutexDuration {
+			return true
+		}
+	}
+	return false
+}
+
+func (ps *Session) isGoroutinesEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileGoroutines {
+			return true
+		}
+	}
+	return false
+}
+
+func (ps *Session) reset(startTime, endTime time.Time) {
+
 	ps.logger.Debugf("profiling session reset %s", startTime.String())
 
 	// first reset should not result in an upload
 	if !ps.startTime.IsZero() {
 		ps.uploadData(startTime, endTime)
 	} else {
-		pprof.StartCPUProfile(ps.cpuBuf)
+		if ps.isCPUEnabled() {
+			pprof.StartCPUProfile(ps.cpuBuf)
+		}
 	}
 
 	ps.startTime = endTime
 }
 
-func (ps *session) uploadData(startTime, endTime time.Time) {
+func (ps *Session) uploadData(startTime, endTime time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
 		defer func() {
 			pprof.StartCPUProfile(ps.cpuBuf)
 		}()
-		ps.upstream.upload(&uploadJob{
+		ps.upstream.Upload(&upstream.UploadJob{
 			Name:            ps.appName,
 			StartTime:       startTime,
 			EndTime:         endTime,
@@ -179,44 +283,129 @@ func (ps *session) uploadData(startTime, endTime time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          pprofFormat,
+			Format:          upstream.FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 		ps.cpuBuf.Reset()
 	}
 
+	if ps.isGoroutinesEnabled() {
+		p := pprof.Lookup("goroutine")
+		if p != nil {
+			p.WriteTo(ps.goroutinesBuf, 0)
+			ps.upstream.Upload(&upstream.UploadJob{
+				Name:            ps.appName,
+				StartTime:       startTime,
+				EndTime:         endTime,
+				SpyName:         "gospy",
+				Units:           "goroutines",
+				AggregationType: "average",
+				Format:          upstream.FormatPprof,
+				Profile:         copyBuf(ps.goroutinesBuf.Bytes()),
+				SampleTypeConfig: map[string]*upstream.SampleType{
+					"goroutine": {
+						DisplayName: "goroutines",
+						Units:       "goroutines",
+						Aggregation: "average",
+					},
+				},
+			})
+			ps.goroutinesBuf.Reset()
+		}
+	}
+
+	if ps.isBlockEnabled() {
+		ps.dumpBlockProfile(startTime, endTime)
+	}
+	if ps.isMutexEnabled() {
+		ps.dumpMutexProfile(startTime, endTime)
+	}
 	if ps.isMemEnabled() {
-		currentGCGeneration := numGC()
-		// sometimes GC doesn't run within 10 seconds
-		//   in such cases we force a GC run
-		//   users can disable it with disableGCRuns option
-		if currentGCGeneration == ps.lastGCGeneration && !ps.disableGCRuns {
-			runtime.GC()
-			currentGCGeneration = numGC()
-		}
-		if currentGCGeneration != ps.lastGCGeneration {
-			pprof.WriteHeapProfile(ps.memBuf)
-			curMemBytes := copyBuf(ps.memBuf.Bytes())
-			ps.memBuf.Reset()
-			if ps.memPrevBytes != nil {
-				ps.upstream.upload(&uploadJob{
-					Name:        ps.appName,
-					StartTime:   startTime,
-					EndTime:     endTime,
-					SpyName:     "gospy",
-					SampleRate:  100,
-					Format:      pprofFormat,
-					Profile:     curMemBytes,
-					PrevProfile: ps.memPrevBytes,
-				})
-			}
-			ps.memPrevBytes = curMemBytes
-			ps.lastGCGeneration = currentGCGeneration
-		}
+		ps.dumpHeapProfile(startTime, endTime)
 	}
 }
 
-func (ps *session) stop() {
+func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump heap profiler panic %s", string(debug.Stack()))
+		}
+	}()
+	currentGCGeneration := numGC()
+	// sometimes GC doesn't run within 10 seconds
+	//   in such cases we force a GC run
+	//   users can disable it with disableGCRuns option
+	if currentGCGeneration == ps.lastGCGeneration && !ps.disableGCRuns {
+		runtime.GC()
+		currentGCGeneration = numGC()
+	}
+	if currentGCGeneration != ps.lastGCGeneration {
+		ps.memBuf.Reset()
+		err := ps.deltaHeap.Profile(ps.memBuf)
+		if err != nil {
+			ps.logger.Errorf("failed to dump heap profile: %s", err)
+			return
+		}
+		curMemBytes := copyBuf(ps.memBuf.Bytes())
+		job := &upstream.UploadJob{
+			Name:             ps.appName,
+			StartTime:        startTime,
+			EndTime:          endTime,
+			SpyName:          "gospy",
+			SampleRate:       100,
+			Format:           upstream.FormatPprof,
+			Profile:          curMemBytes,
+			SampleTypeConfig: sampleTypeConfigHeap,
+		}
+		ps.upstream.Upload(job)
+		ps.lastGCGeneration = currentGCGeneration
+	}
+}
+
+func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump mutex profiler panic %s", string(debug.Stack()))
+		}
+	}()
+	ps.mutexBuf.Reset()
+	ps.deltaMutex.Profile(ps.mutexBuf)
+	curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
+	job := &upstream.UploadJob{
+		Name:             ps.appName,
+		StartTime:        startTime,
+		EndTime:          endTime,
+		SpyName:          "gospy",
+		Format:           upstream.FormatPprof,
+		Profile:          curMutexBuf,
+		SampleTypeConfig: sampleTypeConfigMutex,
+	}
+	ps.upstream.Upload(job)
+}
+
+func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			ps.logger.Errorf("dump block profiler panic %s", string(debug.Stack()))
+		}
+	}()
+	ps.blockBuf.Reset()
+	ps.deltaBlock.Profile(ps.blockBuf)
+	curBlockBuf := copyBuf(ps.blockBuf.Bytes())
+	job := &upstream.UploadJob{
+		Name:             ps.appName,
+		StartTime:        startTime,
+		EndTime:          endTime,
+		SpyName:          "gospy",
+		Format:           upstream.FormatPprof,
+		Profile:          curBlockBuf,
+		SampleTypeConfig: sampleTypeConfigBlock,
+	}
+	ps.upstream.Upload(job)
+}
+
+
+func (ps *Session) Stop() {
 	ps.trieMutex.Lock()
 	defer ps.trieMutex.Unlock()
 
@@ -228,10 +417,10 @@ func (ps *session) stop() {
 	})
 }
 
-func (ps *session) uploadLastBitOfData(now time.Time) {
+func (ps *Session) uploadLastBitOfData(now time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
-		ps.upstream.upload(&uploadJob{
+		ps.upstream.Upload(&upstream.UploadJob{
 			Name:            ps.appName,
 			StartTime:       ps.startTime,
 			EndTime:         now,
@@ -239,10 +428,26 @@ func (ps *session) uploadLastBitOfData(now time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          pprofFormat,
+			Format:          upstream.FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 	}
+}
+
+func (ps *Session) flush(wait bool) {
+	f := &flush{
+		wg:   sync.WaitGroup{},
+		wait: wait,
+	}
+	f.wg.Add(1)
+	ps.flushCh <- f
+	if wait {
+		f.wg.Wait()
+	}
+}
+
+func (ps *Session) truncatedTime() time.Time {
+	return time.Now().Truncate(ps.uploadRate)
 }
 
 func numGC() uint32 {
