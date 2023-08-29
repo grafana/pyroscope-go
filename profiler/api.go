@@ -1,4 +1,4 @@
-package pyroscope
+package profiler
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/pyroscope-io/client/upstream/remote"
+	"github.com/grafana/pyroscope-golang/upstream/remote"
 )
 
 type Config struct {

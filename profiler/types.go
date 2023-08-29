@@ -1,4 +1,4 @@
-package pyroscope
+package profiler
 
 type ProfileType string
 

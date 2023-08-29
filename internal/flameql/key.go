@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pyroscope-io/client/internal/sortedmap"
+	"github.com/grafana/pyroscope-golang/internal/sortedmap"
 )
 
 type Key struct {

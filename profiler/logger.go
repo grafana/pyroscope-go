@@ -1,4 +1,4 @@
-package pyroscope
+package profiler
 
 import "fmt"
 
@@ -16,5 +16,7 @@ func (*standardLoggerImpl) Infof(a string, b ...interface{})  { fmt.Printf("[INF
 func (*standardLoggerImpl) Debugf(a string, b ...interface{}) { fmt.Printf("[DEBUG] "+a+"\n", b...) }
 func (*standardLoggerImpl) Errorf(a string, b ...interface{}) { fmt.Printf("[ERROR] "+a+"\n", b...) }
 
-var noopLogger = &noopLoggerImpl{}
-var StandardLogger = &standardLoggerImpl{}
+var (
+	noopLogger     = &noopLoggerImpl{}
+	StandardLogger = &standardLoggerImpl{}
+)
