@@ -8,7 +8,7 @@ For more information, please visit our [golang integration documentation](https:
 To start profiling a Go application, you need to include our go module in your app:
 ```
 # make sure you also upgrade pyroscope server to version 0.3.1 or higher
-go get github.com/pyroscope-io/client/pyroscope
+go get github.com/grafana/pyroscope-go/pyroscope
 ```
 
 Then add the following code to your application:
@@ -16,7 +16,7 @@ Then add the following code to your application:
 ```go
 package main
 
-import "github.com/pyroscope-io/client/pyroscope"
+import "github.com/grafana/pyroscope-go"
 
 func main() {
   pyroscope.Start(pyroscope.Config{

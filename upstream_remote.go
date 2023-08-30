@@ -1,4 +1,4 @@
-package remote
+package pyroscope
 
 import (
 	"bytes"
@@ -15,8 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/pyroscope-io/client/upstream"
 )
 
 var (
@@ -26,8 +24,8 @@ var (
 const cloudHostnameSuffix = "pyroscope.cloud"
 
 type Remote struct {
-	cfg    Config
-	jobs   chan *upstream.UploadJob
+	cfg    RemoteConfig
+	jobs   chan *UploadJob
 	client *http.Client
 	logger Logger
 
@@ -37,7 +35,7 @@ type Remote struct {
 	flushWG sync.WaitGroup
 }
 
-type Config struct {
+type RemoteConfig struct {
 	AuthToken         string
 	BasicAuthUser     string // http basic auth user
 	BasicAuthPassword string // http basic auth password
@@ -49,16 +47,10 @@ type Config struct {
 	Logger            Logger
 }
 
-type Logger interface {
-	Infof(_ string, _ ...interface{})
-	Debugf(_ string, _ ...interface{})
-	Errorf(_ string, _ ...interface{})
-}
-
-func NewRemote(cfg Config) (*Remote, error) {
+func NewRemote(cfg RemoteConfig) (*Remote, error) {
 	r := &Remote{
 		cfg:  cfg,
-		jobs: make(chan *upstream.UploadJob, 20),
+		jobs: make(chan *UploadJob, 20),
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxConnsPerHost: cfg.Threads,
@@ -107,7 +99,7 @@ func (r *Remote) Stop() {
 	r.wg.Wait()
 }
 
-func (r *Remote) Upload(j *upstream.UploadJob) {
+func (r *Remote) Upload(j *UploadJob) {
 	r.flushWG.Add(1)
 	select {
 	case r.jobs <- j:
@@ -116,6 +108,7 @@ func (r *Remote) Upload(j *upstream.UploadJob) {
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
 	}
 }
+
 func (r *Remote) Flush() {
 	if r.done == nil {
 		return
@@ -123,7 +116,7 @@ func (r *Remote) Flush() {
 	r.flushWG.Wait()
 }
 
-func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
+func (r *Remote) uploadProfile(j *UploadJob) error {
 	u, err := url.Parse(r.cfg.Address)
 	if err != nil {
 		return fmt.Errorf("url parse: %v", err)
@@ -232,7 +225,7 @@ func requiresAuthToken(u *url.URL) bool {
 }
 
 // do safe upload
-func (r *Remote) safeUpload(job *upstream.UploadJob) {
+func (r *Remote) safeUpload(job *UploadJob) {
 	defer func() {
 		if catch := recover(); catch != nil {
 			r.logger.Errorf("recover stack: %v: %v", catch, string(debug.Stack()))

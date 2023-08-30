@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/pyroscope-io/client/pyroscope"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"sync"
+
+	"github.com/grafana/pyroscope-go"
 )
 
 //go:noinline

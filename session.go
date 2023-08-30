@@ -2,20 +2,20 @@ package pyroscope
 
 import (
 	"bytes"
-	"github.com/pyroscope-io/client/internal/alignedticker"
-	"github.com/pyroscope-io/godeltaprof"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"sync"
 	"time"
 
-	"github.com/pyroscope-io/client/internal/flameql"
-	"github.com/pyroscope-io/client/upstream"
+	"github.com/pyroscope-io/godeltaprof"
+
+	"github.com/grafana/pyroscope-go/internal/alignedticker"
+	"github.com/grafana/pyroscope-go/internal/flameql"
 )
 
 var (
-	sampleTypeConfigHeap = map[string]*upstream.SampleType{
+	sampleTypeConfigHeap = map[string]*SampleType{
 		"alloc_objects": {
 			Units:      "objects",
 			Cumulative: false,
@@ -35,7 +35,7 @@ var (
 			Cumulative:  false,
 		},
 	}
-	sampleTypeConfigMutex = map[string]*upstream.SampleType{
+	sampleTypeConfigMutex = map[string]*SampleType{
 		"contentions": {
 			DisplayName: "mutex_count",
 			Units:       "lock_samples",
@@ -47,7 +47,7 @@ var (
 			Cumulative:  false,
 		},
 	}
-	sampleTypeConfigBlock = map[string]*upstream.SampleType{
+	sampleTypeConfigBlock = map[string]*SampleType{
 		"contentions": {
 			DisplayName: "block_count",
 			Units:       "lock_samples",
@@ -63,7 +63,7 @@ var (
 
 type Session struct {
 	// configuration, doesn't change
-	upstream               upstream.Upstream
+	upstream               Upstream
 	sampleRate             uint32
 	profileTypes           []ProfileType
 	uploadRate             time.Duration
@@ -94,7 +94,7 @@ type Session struct {
 }
 
 type SessionConfig struct {
-	Upstream               upstream.Upstream
+	Upstream               Upstream
 	Logger                 Logger
 	AppName                string
 	Tags                   map[string]string
@@ -203,7 +203,6 @@ func copyBuf(b []byte) []byte {
 func (ps *Session) Start() error {
 	t := ps.truncatedTime()
 	ps.reset(t, t)
-
 	go ps.takeSnapshots()
 	return nil
 }
@@ -254,7 +253,6 @@ func (ps *Session) isGoroutinesEnabled() bool {
 }
 
 func (ps *Session) reset(startTime, endTime time.Time) {
-
 	ps.logger.Debugf("profiling session reset %s", startTime.String())
 
 	// first reset should not result in an upload
@@ -275,7 +273,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 		defer func() {
 			pprof.StartCPUProfile(ps.cpuBuf)
 		}()
-		ps.upstream.Upload(&upstream.UploadJob{
+		ps.upstream.Upload(&UploadJob{
 			Name:            ps.appName,
 			StartTime:       startTime,
 			EndTime:         endTime,
@@ -283,7 +281,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          upstream.FormatPprof,
+			Format:          FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 		ps.cpuBuf.Reset()
@@ -293,16 +291,16 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 		p := pprof.Lookup("goroutine")
 		if p != nil {
 			p.WriteTo(ps.goroutinesBuf, 0)
-			ps.upstream.Upload(&upstream.UploadJob{
+			ps.upstream.Upload(&UploadJob{
 				Name:            ps.appName,
 				StartTime:       startTime,
 				EndTime:         endTime,
 				SpyName:         "gospy",
 				Units:           "goroutines",
 				AggregationType: "average",
-				Format:          upstream.FormatPprof,
+				Format:          FormatPprof,
 				Profile:         copyBuf(ps.goroutinesBuf.Bytes()),
-				SampleTypeConfig: map[string]*upstream.SampleType{
+				SampleTypeConfig: map[string]*SampleType{
 					"goroutine": {
 						DisplayName: "goroutines",
 						Units:       "goroutines",
@@ -347,13 +345,13 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 			return
 		}
 		curMemBytes := copyBuf(ps.memBuf.Bytes())
-		job := &upstream.UploadJob{
+		job := &UploadJob{
 			Name:             ps.appName,
 			StartTime:        startTime,
 			EndTime:          endTime,
 			SpyName:          "gospy",
 			SampleRate:       100,
-			Format:           upstream.FormatPprof,
+			Format:           FormatPprof,
 			Profile:          curMemBytes,
 			SampleTypeConfig: sampleTypeConfigHeap,
 		}
@@ -371,12 +369,12 @@ func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
 	ps.mutexBuf.Reset()
 	ps.deltaMutex.Profile(ps.mutexBuf)
 	curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
-	job := &upstream.UploadJob{
+	job := &UploadJob{
 		Name:             ps.appName,
 		StartTime:        startTime,
 		EndTime:          endTime,
 		SpyName:          "gospy",
-		Format:           upstream.FormatPprof,
+		Format:           FormatPprof,
 		Profile:          curMutexBuf,
 		SampleTypeConfig: sampleTypeConfigMutex,
 	}
@@ -392,18 +390,17 @@ func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
 	ps.blockBuf.Reset()
 	ps.deltaBlock.Profile(ps.blockBuf)
 	curBlockBuf := copyBuf(ps.blockBuf.Bytes())
-	job := &upstream.UploadJob{
+	job := &UploadJob{
 		Name:             ps.appName,
 		StartTime:        startTime,
 		EndTime:          endTime,
 		SpyName:          "gospy",
-		Format:           upstream.FormatPprof,
+		Format:           FormatPprof,
 		Profile:          curBlockBuf,
 		SampleTypeConfig: sampleTypeConfigBlock,
 	}
 	ps.upstream.Upload(job)
 }
-
 
 func (ps *Session) Stop() {
 	ps.trieMutex.Lock()
@@ -420,7 +417,7 @@ func (ps *Session) Stop() {
 func (ps *Session) uploadLastBitOfData(now time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
-		ps.upstream.Upload(&upstream.UploadJob{
+		ps.upstream.Upload(&UploadJob{
 			Name:            ps.appName,
 			StartTime:       ps.startTime,
 			EndTime:         now,
@@ -428,7 +425,7 @@ func (ps *Session) uploadLastBitOfData(now time.Time) {
 			SampleRate:      100,
 			Units:           "samples",
 			AggregationType: "sum",
-			Format:          upstream.FormatPprof,
+			Format:          FormatPprof,
 			Profile:         copyBuf(ps.cpuBuf.Bytes()),
 		})
 	}

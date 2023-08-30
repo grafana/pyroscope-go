@@ -6,9 +6,31 @@ import (
 	"os"
 	"runtime/pprof"
 	"time"
-
-	"github.com/pyroscope-io/client/upstream/remote"
 )
+
+type ProfileType string
+
+const (
+	ProfileCPU           ProfileType = "cpu"
+	ProfileInuseObjects  ProfileType = "inuse_objects"
+	ProfileAllocObjects  ProfileType = "alloc_objects"
+	ProfileInuseSpace    ProfileType = "inuse_space"
+	ProfileAllocSpace    ProfileType = "alloc_space"
+	ProfileGoroutines    ProfileType = "goroutines"
+	ProfileMutexCount    ProfileType = "mutex_count"
+	ProfileMutexDuration ProfileType = "mutex_duration"
+	ProfileBlockCount    ProfileType = "block_count"
+	ProfileBlockDuration ProfileType = "block_duration"
+	DefaultSampleRate                = 100
+)
+
+var DefaultProfileTypes = []ProfileType{
+	ProfileCPU,
+	ProfileAllocObjects,
+	ProfileAllocSpace,
+	ProfileInuseObjects,
+	ProfileInuseSpace,
+}
 
 type Config struct {
 	ApplicationName        string // e.g backend.purchases
@@ -29,9 +51,35 @@ type Config struct {
 	HTTPHeaders            map[string]string
 }
 
+// Logger is an interface that library users can use
+// It is based on logrus, but much smaller — That's because we don't want library users to have to implement
+// all of the logrus's methods
+type Logger interface {
+	Infof(_ string, _ ...interface{})
+	Debugf(_ string, _ ...interface{})
+	Errorf(_ string, _ ...interface{})
+}
+
+// these loggers implement the types.Logger interface
+
+type noopLoggerImpl struct{}
+
+func (*noopLoggerImpl) Infof(_ string, _ ...interface{})  {}
+func (*noopLoggerImpl) Debugf(_ string, _ ...interface{}) {}
+func (*noopLoggerImpl) Errorf(_ string, _ ...interface{}) {}
+
+type standardLoggerImpl struct{}
+
+func (*standardLoggerImpl) Infof(a string, b ...interface{})  { fmt.Printf("[INFO]  "+a+"\n", b...) }
+func (*standardLoggerImpl) Debugf(a string, b ...interface{}) { fmt.Printf("[DEBUG] "+a+"\n", b...) }
+func (*standardLoggerImpl) Errorf(a string, b ...interface{}) { fmt.Printf("[ERROR] "+a+"\n", b...) }
+
+var noopLogger = &noopLoggerImpl{}
+var StandardLogger = &standardLoggerImpl{}
+
 type Profiler struct {
 	session  *Session
-	uploader *remote.Remote
+	uploader *Remote
 }
 
 // Start starts continuously profiling go code
@@ -52,7 +100,7 @@ func Start(cfg Config) (*Profiler, error) {
 		cfg.ServerAddress = address
 	}
 
-	rc := remote.Config{
+	rc := RemoteConfig{
 		AuthToken:         cfg.AuthToken,
 		TenantID:          cfg.TenantID,
 		BasicAuthUser:     cfg.BasicAuthUser,
@@ -63,7 +111,7 @@ func Start(cfg Config) (*Profiler, error) {
 		Timeout:           30 * time.Second,
 		Logger:            cfg.Logger,
 	}
-	uploader, err := remote.NewRemote(rc)
+	uploader, err := NewRemote(rc)
 	if err != nil {
 		return nil, err
 	}
