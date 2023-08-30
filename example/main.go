@@ -8,7 +8,7 @@ import (
 	"runtime/pprof"
 	"sync"
 
-	"github.com/grafana/pyroscope-golang/profiler"
+	"github.com/grafana/pyroscope-go"
 )
 
 //go:noinline
@@ -26,7 +26,7 @@ func fastFunction(c context.Context, wg *sync.WaitGroup) {
 	m.Lock()
 	defer m.Unlock()
 
-	profiler.TagWrapper(c, profiler.Labels("function", "fast"), func(c context.Context) {
+	pyroscope.TagWrapper(c, pyroscope.Labels("function", "fast"), func(c context.Context) {
 		work(200000000)
 	})
 	wg.Done()
@@ -46,30 +46,30 @@ func slowFunction(c context.Context, wg *sync.WaitGroup) {
 func main() {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
-	profiler.Start(profiler.Config{
+	pyroscope.Start(pyroscope.Config{
 		ApplicationName:   "simple.golang.app-new",
 		ServerAddress:     "http://localhost:4040",
-		Logger:            profiler.StandardLogger,
+		Logger:            pyroscope.StandardLogger,
 		AuthToken:         os.Getenv("PYROSCOPE_AUTH_TOKEN"),
 		TenantID:          os.Getenv("PYROSCOPE_TENANT_ID"),
 		BasicAuthUser:     os.Getenv("PYROSCOPE_BASIC_AUTH_USER"),
 		BasicAuthPassword: os.Getenv("PYROSCOPE_BASIC_AUTH_PASSWORD"),
-		ProfileTypes: []profiler.ProfileType{
-			profiler.ProfileCPU,
-			profiler.ProfileInuseObjects,
-			profiler.ProfileAllocObjects,
-			profiler.ProfileInuseSpace,
-			profiler.ProfileAllocSpace,
-			profiler.ProfileGoroutines,
-			profiler.ProfileMutexCount,
-			profiler.ProfileMutexDuration,
-			profiler.ProfileBlockCount,
-			profiler.ProfileBlockDuration,
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileInuseSpace,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileGoroutines,
+			pyroscope.ProfileMutexCount,
+			pyroscope.ProfileMutexDuration,
+			pyroscope.ProfileBlockCount,
+			pyroscope.ProfileBlockDuration,
 		},
 		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
 
-	profiler.TagWrapper(context.Background(), profiler.Labels("foo", "bar"), func(c context.Context) {
+	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {
 		for {
 			wg := sync.WaitGroup{}
 			wg.Add(2)

@@ -9,7 +9,7 @@ For more information, please visit our [golang integration documentation](https:
 To start profiling a Go application, you need to include our go module in your app:
 
 ```
-go get github.com/grafana/pyroscope-golang/profiler
+go get github.com/grafana/pyroscope-go
 ```
 
 Then add the following code to your application:
@@ -17,17 +17,17 @@ Then add the following code to your application:
 ```go
 package main
 
-import "github.com/grafana/pyroscope-golang/profiler"
+import "github.com/grafana/pyroscope-go"
 
 func main() {
-  profiler.Start(profiler.Config{
+  pyroscope.Start(pyroscope.Config{
     ApplicationName: "simple.golang.app",
 
     // replace this with the address of pyroscope server
     ServerAddress:   "http://pyroscope-server:4040",
 
     // you can disable logging by setting this to nil
-    Logger:          profiler.StandardLogger,
+    Logger:          pyroscope.StandardLogger,
 
     // Optional HTTP Basic authentication (Grafana Cloud)
     BasicAuthUser:     "<User>",
@@ -37,12 +37,12 @@ func main() {
 
     // by default all profilers are enabled,
     // but you can select the ones you want to use:
-    ProfileTypes: []profiler.ProfileType{
-      profiler.ProfileCPU,
-      profiler.ProfileAllocObjects,
-      profiler.ProfileAllocSpace,
-      profiler.ProfileInuseObjects,
-      profiler.ProfileInuseSpace,
+    ProfileTypes: []pyroscope.ProfileType{
+      pyroscope.ProfileCPU,
+      pyroscope.ProfileAllocObjects,
+      pyroscope.ProfileAllocSpace,
+      pyroscope.ProfileInuseObjects,
+      pyroscope.ProfileInuseSpace,
     },
   })
 
@@ -56,7 +56,7 @@ It is possible to add tags (labels) to the profiling data. These tags can be use
 
 ```go
 // these two ways of adding tags are equivalent:
-profiler.TagWrapper(context.Background(), profiler.Labels("controller", "slow_controller"), func(c context.Context) {
+pyroscope.TagWrapper(context.Background(), pyroscope.Labels("controller", "slow_controller"), func(c context.Context) {
   slowCode()
 })
 

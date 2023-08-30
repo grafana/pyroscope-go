@@ -1,4 +1,4 @@
-package profiler
+package pyroscope
 
 import (
 	"bytes"
@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/pyroscope-golang/internal/alignedticker"
+	"github.com/grafana/pyroscope-go/internal/alignedticker"
 	"github.com/pyroscope-io/godeltaprof"
 
-	"github.com/grafana/pyroscope-golang/internal/flameql"
-	"github.com/grafana/pyroscope-golang/upstream"
+	"github.com/grafana/pyroscope-go/internal/flameql"
+	"github.com/grafana/pyroscope-go/upstream"
 )
 
 var (
