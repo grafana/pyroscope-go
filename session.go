@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/pyroscope-go/godeltaprof"
 	"github.com/grafana/pyroscope-go/internal/alignedticker"
-	"github.com/pyroscope-io/godeltaprof"
 
 	"github.com/grafana/pyroscope-go/internal/flameql"
 	"github.com/grafana/pyroscope-go/upstream"
