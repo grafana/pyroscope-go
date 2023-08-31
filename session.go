@@ -2,16 +2,17 @@ package pyroscope
 
 import (
 	"bytes"
-	"github.com/pyroscope-io/client/internal/alignedticker"
-	"github.com/pyroscope-io/godeltaprof"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"sync"
 	"time"
 
-	"github.com/pyroscope-io/client/internal/flameql"
-	"github.com/pyroscope-io/client/upstream"
+	"github.com/grafana/pyroscope-go/internal/alignedticker"
+	"github.com/pyroscope-io/godeltaprof"
+
+	"github.com/grafana/pyroscope-go/internal/flameql"
+	"github.com/grafana/pyroscope-go/upstream"
 )
 
 var (
@@ -254,7 +255,6 @@ func (ps *Session) isGoroutinesEnabled() bool {
 }
 
 func (ps *Session) reset(startTime, endTime time.Time) {
-
 	ps.logger.Debugf("profiling session reset %s", startTime.String())
 
 	// first reset should not result in an upload
@@ -403,7 +403,6 @@ func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
 	}
 	ps.upstream.Upload(job)
 }
-
 
 func (ps *Session) Stop() {
 	ps.trieMutex.Lock()

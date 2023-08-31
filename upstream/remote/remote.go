@@ -16,12 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pyroscope-io/client/upstream"
+	"github.com/grafana/pyroscope-go/upstream"
 )
 
-var (
-	errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
-)
+var errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
 
 const cloudHostnameSuffix = "pyroscope.cloud"
 
@@ -116,6 +114,7 @@ func (r *Remote) Upload(j *upstream.UploadJob) {
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
 	}
 }
+
 func (r *Remote) Flush() {
 	if r.done == nil {
 		return
