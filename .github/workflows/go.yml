@@ -21,3 +21,4 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Build example application
         run: go build example/main.go
+      - run: make test
