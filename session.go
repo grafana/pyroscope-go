@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/grafana/pyroscope-go/godeltaprof"
-	"github.com/grafana/pyroscope-go/internal/alignedticker"
-
 	"github.com/grafana/pyroscope-go/internal/flameql"
 	"github.com/grafana/pyroscope-go/upstream"
 )
@@ -176,7 +174,7 @@ func (ps *Session) takeSnapshots() {
 	if ps.DisableAutomaticResets {
 		automaticResetTicker = make(chan time.Time)
 	} else {
-		t := alignedticker.NewAlignedTicker(ps.uploadRate)
+		t := time.NewTicker(ps.uploadRate)
 		automaticResetTicker = t.C
 		defer t.Stop()
 	}
