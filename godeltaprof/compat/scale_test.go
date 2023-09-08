@@ -117,7 +117,62 @@ func TestScaleBlock(t *testing.T) {
 	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
 }
 
-//todo add test for memory
+var bufs [][]byte
+
+//go:noinline
+func appendBuf(sz int) {
+	elems := make([]byte, 0, sz)
+	bufs = append(bufs, elems)
+}
+
+func TestScaleHeap(t *testing.T) {
+	prev := runtime.MemProfileRate
+	runtime.MemProfileRate = 0
+
+	const size = 64 * 1024
+	const iters = 1024
+
+	const expectedCount = iters
+	const expectedTime = 1000000
+
+	bufs = make([][]byte, 0, iters)
+	defer func() {
+		bufs = nil
+		runtime.MemProfileRate = prev
+	}()
+
+	buffer := bytes.NewBuffer(make([]byte, 0, 1024*1024))
+	profiler := godeltaprof.NewHeapProfiler()
+	err := profiler.Profile(io.Discard)
+	require.NoError(t, err)
+
+	runtime.MemProfileRate = 1
+	for i := 0; i < iters; i++ {
+		appendBuf(size)
+	}
+
+	time.Sleep(time.Second)
+	runtime.GC()
+	time.Sleep(time.Second)
+
+	expected := []int64{iters, iters * size, iters, iters * size}
+	err = profiler.Profile(buffer)
+	require.NoError(t, err)
+
+	profile, err := gprofile.Parse(buffer)
+	require.NoError(t, err)
+
+	res := stackCollapseProfile(profile)
+
+	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleHeap;github.com/grafana/pyroscope-go/godeltaprof/compat.appendBuf")
+	require.NotNil(t, my)
+
+	fmt.Println(my.value)
+	fmt.Println(expected)
+	for i := range my.value {
+		assert.Less(t, math.Abs(float64(my.value[i])-float64(expected[i])), 0.1*float64(expected[i]))
+	}
+}
 
 type stack struct {
 	funcs []string
@@ -127,7 +182,7 @@ type stack struct {
 
 func findStack(res []stack, line string) *stack {
 	for i, re := range res {
-		fmt.Println(re.line)
+		//fmt.Println(re.line, re.value)
 		if strings.Contains(re.line, line) {
 			return &res[i]
 		}
@@ -146,6 +201,7 @@ func stackCollapseProfile(p *gprofile.Profile) []stack {
 			loc := s.Location[i]
 			for _, line := range loc.Line {
 				f := line.Function
+				//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
 				funcs = append(funcs, f.Name)
 			}
 		}
