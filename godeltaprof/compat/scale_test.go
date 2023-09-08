@@ -57,23 +57,67 @@ func TestScaleMutex(t *testing.T) {
 	profile, err := gprofile.Parse(buffer)
 	require.NoError(t, err)
 
-	res := StackCollapseProfile(profile)
+	res := stackCollapseProfile(profile)
 
-	var my []stack
-	for _, re := range res {
-		if strings.Contains(re.line, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex") {
-			my = append(my, re)
-		}
-	}
-	assert.Equal(t, 1, len(my))
-	first := my[0]
-	fmt.Println(first.value[0], first.value[1])
+	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex")
+	require.NotNil(t, my)
+
+	fmt.Println(my.value[0], my.value[1])
 	fmt.Println(expectedCount, expectedTime)
-	assert.Less(t, math.Abs(float64(first.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
-	assert.Less(t, math.Abs(float64(first.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
+
+	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
+	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
 }
 
-//todo add test for memory, block just in case
+func TestScaleBlock(t *testing.T) {
+	defer runtime.SetBlockProfileRate(0)
+
+	buffer := bytes.NewBuffer(make([]byte, 0, 1024*1024))
+	profiler := godeltaprof.NewBlockProfiler()
+	err := profiler.Profile(io.Discard)
+	require.NoError(t, err)
+
+	const fraction = 5
+	const iters = 5000
+	const workers = 2
+	const expectedCount = workers * iters
+	const expectedTime = expectedCount * 1000000
+
+	runtime.SetBlockProfileRate(fraction)
+
+	wg := sync.WaitGroup{}
+	wg.Add(workers)
+	for j := 0; j < workers; j++ {
+		go func() {
+			for i := 0; i < iters; i++ {
+				m.Lock()
+				time.Sleep(time.Millisecond)
+				m.Unlock()
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	err = profiler.Profile(buffer)
+	require.NoError(t, err)
+
+	profile, err := gprofile.Parse(buffer)
+	require.NoError(t, err)
+
+	res := stackCollapseProfile(profile)
+
+	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleBlock")
+	require.NotNil(t, my)
+
+	fmt.Println(my.value[0], my.value[1])
+	fmt.Println(expectedCount, expectedTime)
+
+	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
+	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
+}
+
+//todo add test for memory
 
 type stack struct {
 	funcs []string
@@ -81,7 +125,18 @@ type stack struct {
 	value []int64
 }
 
-func StackCollapseProfile(p *gprofile.Profile) []stack {
+func findStack(res []stack, line string) *stack {
+	for i, re := range res {
+		fmt.Println(re.line)
+		if strings.Contains(re.line, line) {
+			return &res[i]
+		}
+	}
+
+	return nil
+}
+
+func stackCollapseProfile(p *gprofile.Profile) []stack {
 
 	var ret []stack
 	for _, s := range p.Sample {
