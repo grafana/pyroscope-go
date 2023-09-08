@@ -2,8 +2,8 @@ package compat
 
 import (
 	"bytes"
-	"fmt"
 	"io"
+	"math"
 	"runtime"
 	"sort"
 	"strings"
@@ -30,6 +30,8 @@ func TestScaleMutex(t *testing.T) {
 	const fraction = 2
 	const iters = 1000
 	const workers = 2
+	const expected = workers * iters
+
 	runtime.SetMutexProfileFraction(fraction)
 
 	wg := sync.WaitGroup{}
@@ -53,16 +55,25 @@ func TestScaleMutex(t *testing.T) {
 	require.NoError(t, err)
 
 	res := StackCollapseProfile(profile, 0, 1)
+
+	var my []stack
 	for _, re := range res {
-		fmt.Println(re)
+		if strings.Contains(re.line, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex") {
+			my = append(my, re)
+		}
 	}
+	require.Len(t, my, 1)
+
+	require.Less(t, math.Abs(float64(my[0].value-expected)), 0.1*expected)
 }
 
-func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []string {
-	type stack struct {
-		funcs string
-		value int64
-	}
+type stack struct {
+	funcs []string
+	line  string
+	value int64
+}
+
+func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []stack {
 
 	var ret []stack
 	for _, s := range p.Sample {
@@ -85,12 +96,13 @@ func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []st
 			v = int64(float64(v) * scale)
 		}
 		ret = append(ret, stack{
-			funcs: strings.Join(funcs, ";"),
+			line:  strings.Join(funcs, ";"),
+			funcs: funcs,
 			value: v,
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool {
-		return strings.Compare(ret[i].funcs, ret[j].funcs) < 0
+		return strings.Compare(ret[i].line, ret[j].line) < 0
 	})
 	var unique []stack
 	for _, s := range ret {
@@ -98,7 +110,7 @@ func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []st
 			unique = append(unique, s)
 			continue
 		}
-		if unique[len(unique)-1].funcs == s.funcs {
+		if unique[len(unique)-1].line == s.line {
 			unique[len(unique)-1].value += s.value
 			continue
 		}
@@ -106,9 +118,5 @@ func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []st
 
 	}
 
-	res := []string{}
-	for _, s := range unique {
-		res = append(res, fmt.Sprintf("%s %d", s.funcs, s.value))
-	}
-	return res
+	return unique
 }
