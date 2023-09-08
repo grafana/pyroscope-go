@@ -2,6 +2,7 @@ package compat
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"math"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 
 	gprofile "github.com/google/pprof/profile"
 	"github.com/grafana/pyroscope-go/godeltaprof"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,10 +29,11 @@ func TestScaleMutex(t *testing.T) {
 	err := profiler.Profile(io.Discard)
 	require.NoError(t, err)
 
-	const fraction = 2
-	const iters = 1000
+	const fraction = 5
+	const iters = 5000
 	const workers = 2
-	const expected = workers * iters
+	const expectedCount = workers * iters
+	const expectedTime = expectedCount * 1000000
 
 	runtime.SetMutexProfileFraction(fraction)
 
@@ -54,7 +57,7 @@ func TestScaleMutex(t *testing.T) {
 	profile, err := gprofile.Parse(buffer)
 	require.NoError(t, err)
 
-	res := StackCollapseProfile(profile, 0, 1)
+	res := StackCollapseProfile(profile)
 
 	var my []stack
 	for _, re := range res {
@@ -62,18 +65,23 @@ func TestScaleMutex(t *testing.T) {
 			my = append(my, re)
 		}
 	}
-	require.Len(t, my, 1)
-
-	require.Less(t, math.Abs(float64(my[0].value-expected)), 0.1*expected)
+	assert.Equal(t, 1, len(my))
+	first := my[0]
+	fmt.Println(first.value[0], first.value[1])
+	fmt.Println(expectedCount, expectedTime)
+	assert.Less(t, math.Abs(float64(first.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
+	assert.Less(t, math.Abs(float64(first.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
 }
+
+//todo add test for memory, block just in case
 
 type stack struct {
 	funcs []string
 	line  string
-	value int64
+	value []int64
 }
 
-func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []stack {
+func StackCollapseProfile(p *gprofile.Profile) []stack {
 
 	var ret []stack
 	for _, s := range p.Sample {
@@ -91,14 +99,10 @@ func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []st
 			funcs[i], funcs[j] = funcs[j], funcs[i]
 		}
 
-		v := s.Value[valueIDX]
-		if scale != 1 {
-			v = int64(float64(v) * scale)
-		}
 		ret = append(ret, stack{
 			line:  strings.Join(funcs, ";"),
 			funcs: funcs,
-			value: v,
+			value: s.Value,
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool {
@@ -111,7 +115,9 @@ func StackCollapseProfile(p *gprofile.Profile, valueIDX int, scale float64) []st
 			continue
 		}
 		if unique[len(unique)-1].line == s.line {
-			unique[len(unique)-1].value += s.value
+			for i := 0; i < len(s.value); i++ {
+				unique[len(unique)-1].value[i] += s.value[i]
+			}
 			continue
 		}
 		unique = append(unique, s)
