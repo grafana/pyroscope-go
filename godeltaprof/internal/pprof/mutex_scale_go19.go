@@ -6,7 +6,7 @@ package pprof
 import "runtime"
 
 type MutexProfileScaler struct {
-	f func(cnt int64, ns float64) (cnt int64, ns float64)
+	f func(cnt int64, ns float64) (int64, float64)
 }
 
 func scaleMutexProfile(scaler MutexProfileScaler, cnt int64, ns float64) (int64, float64) {
