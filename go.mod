@@ -4,4 +4,4 @@ go 1.17
 
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
-require github.com/grafana/pyroscope-go/godeltaprof v0.1.3
+require github.com/grafana/pyroscope-go/godeltaprof v0.1.4
