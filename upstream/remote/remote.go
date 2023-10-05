@@ -159,8 +159,8 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	q := u.Query()
 	q.Set("name", j.Name)
 	// TODO: I think these should be renamed to startTime / endTime
-	q.Set("from", strconv.Itoa(int(j.StartTime.UnixNano())))
-	q.Set("until", strconv.Itoa(int(j.EndTime.UnixNano())))
+	q.Set("from", strconv.FormatInt(j.StartTime.UnixNano(), 10))
+	q.Set("until", strconv.FormatInt(j.EndTime.UnixNano(), 10))
 	q.Set("spyName", j.SpyName)
 	q.Set("sampleRate", strconv.Itoa(int(j.SampleRate)))
 	q.Set("units", j.Units)
