@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	go test -race $(shell go list ./... ./godeltaprof/compat/... ./godeltaprof/... ./otelpyroscope/...)
+	go test -race $(shell go list ./... ./godeltaprof/compat/... ./godeltaprof/...)
 
 .PHONY: go/mod
 go/mod:
