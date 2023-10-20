@@ -2,6 +2,7 @@ go 1.19
 
 use (
 	.
-	./godeltaprof/
-	./godeltaprof/compat
+	godeltaprof
+	godeltaprof/compat
+	otelpyroscope
 )
