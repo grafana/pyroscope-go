@@ -78,6 +78,7 @@ type Session struct {
 	logger    Logger
 	stopOnce  sync.Once
 	stopCh    chan struct{}
+	wg        sync.WaitGroup
 	flushCh   chan *flush
 	trieMutex sync.Mutex
 
@@ -210,7 +211,11 @@ func (ps *Session) Start() error {
 	t := ps.truncatedTime()
 	ps.reset(t, t)
 
-	go ps.takeSnapshots()
+	ps.wg.Add(1)
+	go func() {
+		defer ps.wg.Done()
+		ps.takeSnapshots()
+	}()
 	return nil
 }
 
@@ -416,6 +421,7 @@ func (ps *Session) Stop() {
 	ps.stopOnce.Do(func() {
 		// TODO: wait for stopCh consumer to finish!
 		close(ps.stopCh)
+		ps.wg.Wait()
 		// before stopping, upload the tries
 		ps.uploadLastBitOfData(time.Now())
 	})
@@ -424,6 +430,10 @@ func (ps *Session) Stop() {
 func (ps *Session) uploadLastBitOfData(now time.Time) {
 	if ps.isCPUEnabled() {
 		pprof.StopCPUProfile()
+		prof := ps.cpuBuf.Bytes()
+		if len(prof) == 0 {
+			return
+		}
 		ps.upstream.Upload(&upstream.UploadJob{
 			Name:            ps.appName,
 			StartTime:       ps.startTime,
@@ -433,7 +443,7 @@ func (ps *Session) uploadLastBitOfData(now time.Time) {
 			Units:           "samples",
 			AggregationType: "sum",
 			Format:          upstream.FormatPprof,
-			Profile:         copyBuf(ps.cpuBuf.Bytes()),
+			Profile:         copyBuf(prof),
 		})
 	}
 }
