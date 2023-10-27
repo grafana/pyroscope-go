@@ -97,17 +97,20 @@ out:
 			}
 		}
 	}
+
+	prBodyFile := createTempFile(msg)
+
 	if found == -1 {
 		log.Println("existing PR not found, creating a new one")
-		createPR(msg)
+		createPR(prBodyFile)
 	} else {
 		log.Printf("found existing PR %+v. updating.", prs[found])
-		updatePR(msg, prs[found])
+		updatePR(prBodyFile, prs[found])
 	}
 
 }
 
-func updatePR(msg string, request PullRequest) {
+func updatePR(prBodyFile string, request PullRequest) {
 	branchName := createBranchName()
 	commitMessage := createCommitMessage()
 
@@ -119,11 +122,11 @@ func updatePR(msg string, request PullRequest) {
 	shMy.sh(fmt.Sprintf("git commit -am '%s'", commitMessage))
 	shMy.sh(fmt.Sprintf("git push -f %s %s:%s", myRemote, branchName, request.HeadRefName))
 
-	shMy.sh(fmt.Sprintf("gh pr edit %d --body '%s'", request.Number, msg))
+	shMy.sh(fmt.Sprintf("gh pr edit %d --body-file '%s'", request.Number, prBodyFile))
 
 }
 
-func createPR(msg string) {
+func createPR(prBodyFile string) {
 	branchName := createBranchName()
 	commitMessage := createCommitMessage()
 
@@ -135,7 +138,7 @@ func createPR(msg string) {
 	shMy.sh(fmt.Sprintf("git commit -am '%s'", commitMessage))
 	shMy.sh(fmt.Sprintf("git push %s %s", myRemote, branchName))
 
-	shMy.sh(fmt.Sprintf("gh pr create --title '%s' --body '%s' --label '%s' ", commitMessage, msg, label))
+	shMy.sh(fmt.Sprintf("gh pr create --title '%s' --body-file '%s' --label '%s' ", commitMessage, prBodyFile, label))
 
 }
 
@@ -208,6 +211,16 @@ func getRepoDir() string {
 	cwd, err := os.Getwd()
 	requireNoError(err, "cwd")
 	return path.Join(cwd, repoDir)
+}
+
+func createTempFile(body string) string {
+	prBodyFile, err := os.CreateTemp("", "check_golang_profiler_changes")
+	requireNoError(err, "create temp file")
+	prBodyFilePath := prBodyFile.Name()
+	defer os.Remove(prBodyFilePath)
+	prBodyFile.Write([]byte(body))
+	prBodyFile.Close()
+	return prBodyFilePath
 }
 
 type PullRequest struct {
