@@ -13,7 +13,7 @@ const (
 	spanNameLabelName = "span_name"
 )
 
-var profilingEnabledSpanAttributeKey = attribute.Key("pyroscope.profiling.enabled")
+var profileIDSpanAttributeKey = attribute.Key("pyroscope.profile.id")
 
 type Option func(*tracerProvider)
 
@@ -97,13 +97,13 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 		labels = append(labels, spanIDLabelName, spanID)
 	}
 
-	// We mark spans with "pyroscope.profiling.enabled" attribute,
-	// only if they can have profiles. Note that the presence
-	// of the attribute does not indicate that we actually have
-	// collected any samples for the span.
+	// We mark spans with "pyroscope.profile.id" attribute,
+	// only if they _can_ have profiles. Presence of the attribute
+	// does not indicate the fact that we actually have collected
+	// any samples for the span.
 	if (w.p.config.spanIDScope == scopeRootSpan && spanID == rs.id) ||
 		w.p.config.spanIDScope == scopeAllSpans {
-		span.SetAttributes(profilingEnabledSpanAttributeKey.Bool(true))
+		span.SetAttributes(profileIDSpanAttributeKey.String(spanID))
 	}
 
 	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))
