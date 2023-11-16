@@ -217,7 +217,6 @@ func createTempFile(body string) string {
 	prBodyFile, err := os.CreateTemp("", "check_golang_profiler_changes")
 	requireNoError(err, "create temp file")
 	prBodyFilePath := prBodyFile.Name()
-	defer os.Remove(prBodyFilePath)
 	prBodyFile.Write([]byte(body))
 	prBodyFile.Close()
 	return prBodyFilePath
