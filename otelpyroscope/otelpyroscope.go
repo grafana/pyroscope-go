@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -19,6 +20,7 @@ type Option func(*tracerProvider)
 
 // tracerProvider satisfies open telemetry TracerProvider interface.
 type tracerProvider struct {
+	noop.TracerProvider
 	tp     trace.TracerProvider
 	config config
 }
@@ -50,6 +52,7 @@ func (w *tracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 }
 
 type profileTracer struct {
+	noop.Tracer
 	p  *tracerProvider
 	tr trace.Tracer
 }
