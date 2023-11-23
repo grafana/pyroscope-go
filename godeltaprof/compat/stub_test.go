@@ -59,3 +59,8 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 		t.Fatalf("function %s %s not found", pkg, name)
 	}
 }
+
+func TestRuntimeFrameSymbolName(t *testing.T) {
+	// todo check runtime_FrameSymbolName
+	t.Fail()
+}

@@ -20,6 +20,13 @@ import (
 // (The name shows up in the pprof graphs.)
 func lostProfileEvent() { lostProfileEvent() }
 
+type ProfileBuilderOptions struct {
+	// for go1.21+ if true - use runtime_FrameSymbolName - produces frames with generic types, for example [go.shape.int]
+	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]
+	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
+	GenericsFrames bool
+}
+
 // A profileBuilder writes a profile incrementally from a
 // stream of profile samples delivered by the runtime.
 type profileBuilder struct {
@@ -27,7 +34,6 @@ type profileBuilder struct {
 	end        time.Time
 	havePeriod bool
 	period     int64
-	//m          profMap
 
 	// encoding state
 	w         io.Writer
@@ -39,14 +45,17 @@ type profileBuilder struct {
 	funcs     map[string]int      // Package path-qualified function name to Function.ID
 	mem       []memMap
 	deck      pcDeck
+
+	opt ProfileBuilderOptions
 }
 
 type memMap struct {
 	// initialized as reading mapping
-	start         uintptr
-	end           uintptr
-	offset        uint64
-	file, buildID string
+	start   uintptr // Address at which the binary (or DLL) is loaded into memory.
+	end     uintptr // The limit of the address range occupied by this mapping.
+	offset  uint64  // Offset in the binary that corresponds to the first mapped address.
+	file    string  // The object this entry is loaded from.
+	buildID string  // A string that uniquely identifies a particular program version with high probability.
 
 	funcs symbolizeFlag
 	fake  bool // map entry was faked; /proc/self/maps wasn't available
@@ -227,7 +236,7 @@ func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
 		frame.PC = addr - 1
 	}
 	ret := []runtime.Frame{frame}
-	for frame.Function != "runtime.goexit" && more == true {
+	for frame.Function != "runtime.goexit" && more {
 		frame, more = frames.Next()
 		ret = append(ret, frame)
 	}
@@ -253,7 +262,7 @@ type locInfo struct {
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
-func newProfileBuilder(w io.Writer) *profileBuilder {
+func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions) *profileBuilder {
 	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	b := &profileBuilder{
 		w:         w,
@@ -263,83 +272,11 @@ func newProfileBuilder(w io.Writer) *profileBuilder {
 		stringMap: map[string]int{"": 0},
 		locs:      map[uintptr]locInfo{},
 		funcs:     map[string]int{},
+		opt:       opt,
 	}
 	b.readMapping()
 	return b
 }
-
-// addCPUData adds the CPU profiling data to the profile.
-//
-// The data must be a whole number of records, as delivered by the runtime.
-// len(tags) must be equal to the number of records in data.
-//func (b *profileBuilder) addCPUData(data []uint64, tags []unsafe.Pointer) error {
-//	if !b.havePeriod {
-//		// first record is period
-//		if len(data) < 3 {
-//			return fmt.Errorf("truncated profile")
-//		}
-//		if data[0] != 3 || data[2] == 0 {
-//			return fmt.Errorf("malformed profile")
-//		}
-//		// data[2] is sampling rate in Hz. Convert to sampling
-//		// period in nanoseconds.
-//		b.period = 1e9 / int64(data[2])
-//		b.havePeriod = true
-//		data = data[3:]
-//		// Consume tag slot. Note that there isn't a meaningful tag
-//		// value for this record.
-//		tags = tags[1:]
-//	}
-//
-//	// Parse CPU samples from the profile.
-//	// Each sample is 3+n uint64s:
-//	//	data[0] = 3+n
-//	//	data[1] = time stamp (ignored)
-//	//	data[2] = count
-//	//	data[3:3+n] = stack
-//	// If the count is 0 and the stack has length 1,
-//	// that's an overflow record inserted by the runtime
-//	// to indicate that stack[0] samples were lost.
-//	// Otherwise the count is usually 1,
-//	// but in a few special cases like lost non-Go samples
-//	// there can be larger counts.
-//	// Because many samples with the same stack arrive,
-//	// we want to deduplicate immediately, which we do
-//	// using the b.m profMap.
-//	for len(data) > 0 {
-//		if len(data) < 3 || data[0] > uint64(len(data)) {
-//			return fmt.Errorf("truncated profile")
-//		}
-//		if data[0] < 3 || tags != nil && len(tags) < 1 {
-//			return fmt.Errorf("malformed profile")
-//		}
-//		if len(tags) < 1 {
-//			return fmt.Errorf("mismatched profile records and tags")
-//		}
-//		count := data[2]
-//		stk := data[3:data[0]]
-//		data = data[data[0]:]
-//		tag := tags[0]
-//		tags = tags[1:]
-//
-//		if count == 0 && len(stk) == 1 {
-//			// overflow record
-//			count = uint64(stk[0])
-//			stk = []uint64{
-//				// gentraceback guarantees that PCs in the
-//				// stack can be unconditionally decremented and
-//				// still be valid, so we must do the same.
-//				uint64(abi.FuncPCABIInternal(lostProfileEvent) + 1),
-//			}
-//		}
-//		b.m.lookup(stk, tag).count += int64(count)
-//	}
-//
-//	if len(tags) != 0 {
-//		return fmt.Errorf("mismatched profile records and tags")
-//	}
-//	return nil
-//}
 
 // build completes and returns the constructed profile.
 func (b *profileBuilder) build() {
@@ -353,27 +290,6 @@ func (b *profileBuilder) build() {
 		b.pbValueType(tagProfile_PeriodType, "cpu", "nanoseconds")
 		b.pb.int64Opt(tagProfile_Period, b.period)
 	}
-
-	//values := []int64{0, 0}
-	//var locs []uint64
-
-	//for e := b.m.all; e != nil; e = e.nextAll {
-	//	values[0] = e.count
-	//	values[1] = e.count * b.period
-	//
-	//	var labels func()
-	//	if e.tag != nil {
-	//		labels = func() {
-	//			for k, v := range *(*labelMap)(e.tag) {
-	//				b.pbLabel(tagSample_Label, k, v, 0)
-	//			}
-	//		}
-	//	}
-	//
-	//	locs = b.appendLocsForStack(locs[:0], e.stk)
-	//
-	//	b.pbSample(values, locs, labels)
-	//}
 
 	for i, m := range b.mem {
 		hasFunctions := m.funcs == lookupTried // lookupTried but not lookupFailed
@@ -391,6 +307,10 @@ func (b *profileBuilder) build() {
 // appendLocsForStack appends the location IDs for the given stack trace to the given
 // location ID slice, locs. The addresses in the stack are return PCs or 1 + the PC of
 // an inline marker as the runtime traceback function returns.
+//
+// It may return an empty slice even if locs is non-empty, for example if locs consists
+// solely of runtime.goexit. We still count these empty stacks in profiles in order to
+// get the right cumulative sample count.
 //
 // It may emit to b.pb, so there must be no message encoding in progress.
 func (b *profileBuilder) appendLocsForStack(locs []uint64, stk []uintptr) (newLocs []uint64) {
@@ -587,6 +507,7 @@ func (b *profileBuilder) emitLocation() uint64 {
 	type newFunc struct {
 		id         uint64
 		name, file string
+		startLine  int64
 	}
 	newFuncs := make([]newFunc, 0, 8)
 
@@ -607,7 +528,18 @@ func (b *profileBuilder) emitLocation() uint64 {
 		if funcID == 0 {
 			funcID = uint64(len(b.funcs)) + 1
 			b.funcs[frame.Function] = int(funcID)
-			newFuncs = append(newFuncs, newFunc{funcID, frame.Function, frame.File})
+			var name string
+			if b.opt.GenericsFrames {
+				name = runtime_FrameSymbolName(&frame)
+			} else {
+				name = frame.Function
+			}
+			newFuncs = append(newFuncs, newFunc{
+				id:        funcID,
+				name:      name,
+				file:      frame.File,
+				startLine: int64(runtime_FrameStartLine(&frame)),
+			})
 		}
 		b.pbLine(tagLocation_Line, funcID, int64(frame.Line))
 	}
@@ -630,6 +562,7 @@ func (b *profileBuilder) emitLocation() uint64 {
 		b.pb.int64Opt(tagFunction_Name, b.stringIndex(fn.name))
 		b.pb.int64Opt(tagFunction_SystemName, b.stringIndex(fn.name))
 		b.pb.int64Opt(tagFunction_Filename, b.stringIndex(fn.file))
+		b.pb.int64Opt(tagFunction_StartLine, fn.startLine)
 		b.pb.endMessage(tagProfile_Function, start)
 	}
 
@@ -732,13 +665,12 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 			continue
 		}
 
-		// TODO: pprof's remapMappingIDs makes two adjustments:
+		// TODO: pprof's remapMappingIDs makes one adjustment:
 		// 1. If there is an /anon_hugepage mapping first and it is
 		// consecutive to a next mapping, drop the /anon_hugepage.
-		// 2. If start-offset = 0x400000, change start to 0x400000 and offset to 0.
-		// There's no indication why either of these is needed.
-		// Let's try not doing these and see what breaks.
-		// If we do need them, they would go here, before we
+		// There's no indication why this is needed.
+		// Let's try not doing this and see what breaks.
+		// If we do need it, it would go here, before we
 		// enter the mappings into b.mem in the first place.
 
 		buildID, _ := elfBuildID(file)

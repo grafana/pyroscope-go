@@ -8,12 +8,13 @@ import (
 )
 
 type DeltaHeapProfiler struct {
-	m profMap
+	m       profMap
+	Options ProfileBuilderOptions
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
 func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
-	b := newProfileBuilder(w)
+	b := newProfileBuilder(w, d.Options)
 	b.pbValueType(tagProfile_PeriodType, "space", "bytes")
 	b.pb.int64Opt(tagProfile_Period, rate)
 	b.pbValueType(tagProfile_SampleType, "alloc_objects", "count")
