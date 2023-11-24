@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -38,9 +40,7 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 		Tests: true,
 	}
 	pkgs, err := packages.Load(cfg, pkg)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	found := false
 	for _, p := range pkgs {
 		if strings.Contains(p.ID, ".test") {
@@ -50,12 +50,8 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 		if f != nil {
 			found = true
 			ff := f.(*types.Func)
-			if ff.String() != expectedSignature {
-				t.Fatalf("expected %s, got %s", expectedSignature, ff.String())
-			}
+			assert.Equal(t, expectedSignature, ff.String())
 		}
 	}
-	if !found {
-		t.Fatalf("function %s %s not found", pkg, name)
-	}
+	assert.Truef(t, found, "function %s %s not found", pkg, name)
 }
