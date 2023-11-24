@@ -57,7 +57,7 @@ func TestScaleMutex(t *testing.T) {
 
 	res := stackCollapseProfile(profile)
 
-	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex")
+	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex")
 	require.NotNil(t, my)
 
 	fmt.Println(my.value[0], my.value[1])
@@ -105,7 +105,7 @@ func TestScaleBlock(t *testing.T) {
 
 	res := stackCollapseProfile(profile)
 
-	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleBlock")
+	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleBlock")
 	require.NotNil(t, my)
 
 	fmt.Println(my.value[0], my.value[1])
@@ -162,7 +162,7 @@ func TestScaleHeap(t *testing.T) {
 
 	res := stackCollapseProfile(profile)
 
-	my := findStack(res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleHeap;github.com/grafana/pyroscope-go/godeltaprof/compat.appendBuf")
+	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleHeap;github.com/grafana/pyroscope-go/godeltaprof/compat.appendBuf")
 	require.NotNil(t, my)
 
 	fmt.Println(my.value)

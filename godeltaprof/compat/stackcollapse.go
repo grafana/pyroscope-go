@@ -1,11 +1,15 @@
 package compat
 
 import (
+	"io"
 	"regexp"
 	"sort"
 	"strings"
+	"testing"
 
 	gprofile "github.com/google/pprof/profile"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type stack struct {
@@ -14,12 +18,28 @@ type stack struct {
 	value []int64
 }
 
-func findStack(res []stack, re string) *stack {
+func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values ...int64) {
+	profile, err := gprofile.Parse(buffer)
+	require.NoError(t, err)
+	line := findStack(t, stackCollapseProfile(profile), sfPattern)
+	assert.NotNil(t, line)
+	if line != nil {
+		for i := range values {
+			assert.Equal(t, values[i], line.value[i])
+		}
+	}
+}
+
+func findStack(t *testing.T, res []stack, re string) *stack {
 	rr := regexp.MustCompile(re)
 	for i, re := range res {
 		if rr.MatchString(re.line) {
 			return &res[i]
 		}
+	}
+	t.Logf("no %s found", re)
+	for _, s := range res {
+		t.Log(s.line, s.value)
 	}
 	return nil
 }
