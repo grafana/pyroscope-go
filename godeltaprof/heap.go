@@ -41,7 +41,6 @@ func NewHeapProfiler() *HeapProfiler {
 		}}
 }
 
-// todo document
 func NewHeapProfilerWithOptions(options ProfileOptions) *HeapProfiler {
 	return &HeapProfiler{
 		impl: pprof.DeltaHeapProfiler{

@@ -50,7 +50,6 @@ func NewMutexProfiler() *BlockProfiler {
 	}
 }
 
-// todo document
 func NewMutexProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: runtime.MutexProfile,
@@ -83,7 +82,6 @@ func NewBlockProfiler() *BlockProfiler {
 	}
 }
 
-// todo document
 func NewBlockProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: runtime.BlockProfile,
