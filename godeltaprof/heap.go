@@ -36,7 +36,7 @@ func NewHeapProfiler() *HeapProfiler {
 	return &HeapProfiler{
 		impl: pprof.DeltaHeapProfiler{
 			Options: pprof.ProfileBuilderOptions{
-				GenericsFrames: false,
+				GenericsFrames: true,
 			},
 		}}
 }

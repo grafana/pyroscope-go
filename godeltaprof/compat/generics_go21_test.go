@@ -68,15 +68,15 @@ func TestGenericsShape(t *testing.T) {
 		expectStackFrames(t, buffer, expectedRealShape, 1, 2048)
 	})
 
-	t.Run("godeltaprof disabled", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewHeapProfiler()
 		buffer = bytes.NewBuffer(nil)
 		err = profiler.Profile(buffer)
 		require.NoError(t, err)
-		expectStackFrames(t, buffer, expectedOmmitedShape, 1, 2048)
+		expectStackFrames(t, buffer, expectedRealShape, 1, 2048)
 	})
 
-	t.Run("godeltaprof disabled explicitly", func(t *testing.T) {
+	t.Run("godeltaprof generics disabled explicitly", func(t *testing.T) {
 		profiler := godeltaprof.NewHeapProfilerWithOptions(godeltaprof.ProfileOptions{
 			GenericsFrames: false,
 		})
@@ -86,7 +86,7 @@ func TestGenericsShape(t *testing.T) {
 		expectStackFrames(t, buffer, expectedOmmitedShape, 1, 2048)
 	})
 
-	t.Run("godeltaprof enabled explicitly", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled explicitly", func(t *testing.T) {
 		profiler := godeltaprof.NewHeapProfilerWithOptions(godeltaprof.ProfileOptions{
 			GenericsFrames: true,
 		})
@@ -116,12 +116,12 @@ func TestBlock(t *testing.T) {
 		expectStackFrames(t, buffer, expectedRealShape, 19)
 	})
 
-	t.Run("godeltaprof generics disabled by default", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewBlockProfiler()
 		buffer := bytes.NewBuffer(nil)
 		err := profiler.Profile(buffer)
 		require.NoError(t, err)
-		expectStackFrames(t, buffer, expectedOmmitedShape, 19)
+		expectStackFrames(t, buffer, expectedRealShape, 19)
 	})
 
 	t.Run("godeltaprof generics disabled explicitly", func(t *testing.T) {
@@ -165,12 +165,12 @@ func TestMutex(t *testing.T) {
 		expectStackFrames(t, buffer, expectedRealShape, 19)
 	})
 
-	t.Run("godeltaprof generics disabled by default", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewMutexProfiler()
 		buffer := bytes.NewBuffer(nil)
 		err := profiler.Profile(buffer)
 		require.NoError(t, err)
-		expectStackFrames(t, buffer, expectedOmmitedShape, 19)
+		expectStackFrames(t, buffer, expectedRealShape, 19)
 	})
 
 	t.Run("godeltaprof generics disabled explicitly", func(t *testing.T) {

@@ -66,7 +66,7 @@ func TestGenericsShape(t *testing.T) {
 		expectStackFrames(t, buffer, expectedOmmitedShape, 1, 2048)
 	})
 
-	t.Run("godeltaprof generics disabled by default", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewHeapProfiler()
 		buffer := bytes.NewBuffer(nil)
 		err := profiler.Profile(buffer)
@@ -112,7 +112,7 @@ func TestBlock(t *testing.T) {
 		expectStackFrames(t, buffer, expectedOmmitedShape, 19)
 	})
 
-	t.Run("godeltaprof generics disabled by default", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewBlockProfiler()
 		buffer := bytes.NewBuffer(nil)
 		err := profiler.Profile(buffer)
@@ -158,7 +158,7 @@ func TestMutex(t *testing.T) {
 		expectStackFrames(t, buffer, expectedOmmitedShape, 19)
 	})
 
-	t.Run("godeltaprof generics disabled by default", func(t *testing.T) {
+	t.Run("godeltaprof generics enabled by default", func(t *testing.T) {
 		profiler := godeltaprof.NewMutexProfiler()
 		buffer := bytes.NewBuffer(nil)
 		err := profiler.Profile(buffer)

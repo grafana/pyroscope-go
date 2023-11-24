@@ -44,7 +44,7 @@ func NewMutexProfiler() *BlockProfiler {
 		scaleProfile:   pprof.ScalerMutexProfile,
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
-				GenericsFrames: false,
+				GenericsFrames: true,
 			},
 		},
 	}
@@ -76,7 +76,7 @@ func NewBlockProfiler() *BlockProfiler {
 		scaleProfile:   pprof.ScalerBlockProfile,
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
-				GenericsFrames: false,
+				GenericsFrames: true,
 			},
 		},
 	}
