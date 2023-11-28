@@ -63,9 +63,8 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
 
 		scaledObjects, scaledBytes := scaleHeapSample(r.AllocObjects, r.AllocBytes, rate)
-		scaledFreeObjects, scaledFreeBytes := scaleHeapSample(r.FreeObjects, r.FreeBytes, rate)
 		values[0], values[1] = scaledObjects, scaledBytes
-		values[2], values[3] = scaledObjects-scaledFreeObjects, scaledBytes-scaledFreeBytes
+		values[2], values[3] = scaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
 		values[0] -= entry.count.v1
 		values[1] -= entry.count.v2
 		entry.count.v1 = scaledObjects

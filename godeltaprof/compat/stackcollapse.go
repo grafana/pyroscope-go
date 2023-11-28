@@ -31,6 +31,7 @@ func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values 
 	line := findStack(t, stackCollapseProfile(profile), sfPattern)
 	assert.NotNil(t, line)
 	if line != nil {
+		t.Log(line.line, line.value)
 		for i := range values {
 			assert.Equalf(t, values[i], line.value[i], "expected %v, actual %v", values, line.value)
 		}
@@ -38,11 +39,11 @@ func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values 
 }
 
 func findStack(t *testing.T, res []stack, re string) *stack {
-	//fmt.Println("==========")
-	//for _, s := range res {
-	//	fmt.Println(s.line, s.value)
-	//}
-	//fmt.Println("==========")
+	t.Log("========== findStack ==========")
+	for _, s := range res {
+		t.Log(s.line, s.value)
+	}
+	t.Logf("==============================")
 	rr := regexp.MustCompile(re)
 	for i, re := range res {
 		if rr.MatchString(re.line) {
