@@ -18,6 +18,13 @@ type stack struct {
 	value []int64
 }
 
+func expectNoFrames(t *testing.T, buffer io.Reader) {
+	profile, err := gprofile.Parse(buffer)
+	require.NoError(t, err)
+	ls := stackCollapseProfile(profile)
+	assert.Empty(t, ls)
+}
+
 func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values ...int64) {
 	profile, err := gprofile.Parse(buffer)
 	require.NoError(t, err)
@@ -25,12 +32,17 @@ func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values 
 	assert.NotNil(t, line)
 	if line != nil {
 		for i := range values {
-			assert.Equal(t, values[i], line.value[i])
+			assert.Equalf(t, values[i], line.value[i], "expected %v, actual %v", values, line.value)
 		}
 	}
 }
 
 func findStack(t *testing.T, res []stack, re string) *stack {
+	//fmt.Println("==========")
+	//for _, s := range res {
+	//	fmt.Println(s.line, s.value)
+	//}
+	//fmt.Println("==========")
 	rr := regexp.MustCompile(re)
 	for i, re := range res {
 		if rr.MatchString(re.line) {
