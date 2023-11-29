@@ -45,6 +45,7 @@ func NewMutexProfiler() *BlockProfiler {
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: true,
+				LazyMapping:    true,
 			},
 		},
 	}
@@ -57,6 +58,7 @@ func NewMutexProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
+				LazyMapping:    options.LazyMappings,
 			},
 		},
 	}
@@ -77,6 +79,7 @@ func NewBlockProfiler() *BlockProfiler {
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: true,
+				LazyMapping:    true,
 			},
 		},
 	}
@@ -89,6 +92,7 @@ func NewBlockProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 		impl: pprof.DeltaMutexProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
+				LazyMapping:    options.LazyMappings,
 			},
 		},
 	}

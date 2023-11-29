@@ -9,12 +9,16 @@ import (
 
 type DeltaHeapProfiler struct {
 	m       profMap
+	mem     []memMap
 	Options ProfileBuilderOptions
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
 func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
-	b := newProfileBuilder(w, d.Options)
+	if d.mem == nil || !d.Options.LazyMapping {
+		d.mem = readMapping()
+	}
+	b := newProfileBuilder(w, d.Options, d.mem)
 	b.pbValueType(tagProfile_PeriodType, "space", "bytes")
 	b.pb.int64Opt(tagProfile_Period, rate)
 	b.pbValueType(tagProfile_SampleType, "alloc_objects", "count")
