@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"time"
 
 	"github.com/grafana/pyroscope-go"
 )
@@ -67,7 +66,6 @@ func main() {
 			pyroscope.ProfileBlockCount,
 			pyroscope.ProfileBlockDuration,
 		},
-		UploadRate:  time.Second,
 		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
 
