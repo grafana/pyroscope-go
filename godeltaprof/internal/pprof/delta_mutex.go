@@ -28,7 +28,7 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycl
 	values := []int64{0, 0}
 	var locs []uint64
 	for _, r := range records {
-		count, nanosec := scaleMutexProfile(scaler, r.Count, float64(r.Cycles)/cpuGHz)
+		count, nanosec := ScaleMutexProfile(scaler, r.Count, float64(r.Cycles)/cpuGHz)
 		inanosec := int64(nanosec)
 
 		// do the delta
@@ -37,6 +37,13 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycl
 		values[1] = inanosec - entry.count.v2
 		entry.count.v1 = count
 		entry.count.v2 = inanosec
+
+		if values[0] < 0 || values[1] < 0 {
+			continue
+		}
+		if values[0] == 0 && values[1] == 0 {
+			continue
+		}
 
 		// For count profiles, all stack addresses are
 		// return PCs, which is what appendLocsForStack expects.

@@ -61,7 +61,7 @@ func TestScaleBeforeDelta(t *testing.T) {
 	}
 
 	p1 := p(0, 0, 0, 0)
-	expectNoFrames(t, p1)
+	expectEmptyProfile(t, p1)
 
 	p2 := p(v[0].count, v[0].size, 0, 0)
 	expectStackFrames(t, p2, markerPCName,
@@ -70,7 +70,7 @@ func TestScaleBeforeDelta(t *testing.T) {
 	)
 
 	p3 := p(v[0].count, v[0].size, v[0].count, v[0].size)
-	expectNoFrames(t, p3)
+	expectEmptyProfile(t, p3)
 
 	p4 := p(v[1].count, v[1].size, v[0].count, v[0].size)
 	expectStackFrames(t, p4, markerPCName,
@@ -85,7 +85,7 @@ func TestScaleBeforeDelta(t *testing.T) {
 	)
 
 	p6 := p(v[2].count, v[2].size, v[2].count, v[2].size)
-	expectNoFrames(t, p6)
+	expectEmptyProfile(t, p6)
 }
 
 func TestScaleMutexOrder(t *testing.T) {
