@@ -1,5 +1,6 @@
 .PHONY: test
 test:
+	cat godeltaprof/compat/go.mod
 	go test -race $(shell go list ./... ./godeltaprof/compat/... ./godeltaprof/...)
 
 .PHONY: go/mod
