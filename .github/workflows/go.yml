@@ -21,6 +21,9 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
+      - name: Update godeltaprof/compat/go.mod ${{ matrix.go }}
+        if: matrix.go == '1.16' || matrix.go == '1.17'
+        run: make -C godeltaprof/compat downgrade_go_mod
       - name: Install Go stable
         if: matrix.go == 'tip'
         uses: actions/setup-go@v4
