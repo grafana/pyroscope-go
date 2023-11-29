@@ -11,3 +11,7 @@ func runtime_expandFinalInlineFrame(stk []uintptr) []uintptr
 
 //go:linkname runtime_cyclesPerSecond runtime/pprof.runtime_cyclesPerSecond
 func runtime_cyclesPerSecond() int64
+
+func Runtime_cyclesPerSecond() int64 {
+	return runtime_cyclesPerSecond()
+}

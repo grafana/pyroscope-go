@@ -1,6 +1,7 @@
 package compat
 
 import (
+	"bytes"
 	"io"
 	"regexp"
 	"sort"
@@ -18,14 +19,28 @@ type stack struct {
 	value []int64
 }
 
-func expectStackFrames(t *testing.T, buffer io.Reader, sfPattern string, values ...int64) {
+func expectEmptyProfile(t *testing.T, buffer io.Reader) {
 	profile, err := gprofile.Parse(buffer)
 	require.NoError(t, err)
-	line := findStack(t, stackCollapseProfile(profile), sfPattern)
-	assert.NotNil(t, line)
+	ls := stackCollapseProfile(t, profile)
+	assert.Empty(t, ls)
+}
+
+func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
+	profile, err := gprofile.ParseData(buffer.Bytes())
+	require.NoError(t, err)
+	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
+	assert.Nilf(t, line, "stack frame %s found", sfPattern)
+}
+
+func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, values ...int64) {
+	profile, err := gprofile.ParseData(buffer.Bytes())
+	require.NoError(t, err)
+	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
+	assert.NotNilf(t, line, "stack frame %s not found", sfPattern)
 	if line != nil {
 		for i := range values {
-			assert.Equal(t, values[i], line.value[i])
+			assert.Equalf(t, values[i], line.value[i], "expected %v got %v", values, line.value)
 		}
 	}
 }
@@ -37,14 +52,10 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 			return &res[i]
 		}
 	}
-	t.Logf("no %s found", re)
-	for _, s := range res {
-		t.Log(s.line, s.value)
-	}
 	return nil
 }
 
-func stackCollapseProfile(p *gprofile.Profile) []stack {
+func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	var ret []stack
 	for _, s := range p.Sample {
 		var funcs []string
@@ -86,6 +97,11 @@ func stackCollapseProfile(p *gprofile.Profile) []stack {
 		unique = append(unique, s)
 
 	}
+	t.Log("============= stackCollapseProfile ================")
+	for _, s := range unique {
+		t.Log(s.line, s.value)
+	}
+	t.Log("===================================================")
 
 	return unique
 }

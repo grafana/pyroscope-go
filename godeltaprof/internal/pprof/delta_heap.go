@@ -28,29 +28,6 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
 	for _, r := range p {
-		hideRuntime := true
-		for tries := 0; tries < 2; tries++ {
-			stk := r.Stack()
-			// For heap profiles, all stack
-			// addresses are return PCs, which is
-			// what appendLocsForStack expects.
-			if hideRuntime {
-				for i, addr := range stk {
-					if f := runtime.FuncForPC(addr); f != nil && strings.HasPrefix(f.Name(), "runtime.") {
-						continue
-					}
-					// Found non-runtime. Show any runtime uses above it.
-					stk = stk[i:]
-					break
-				}
-			}
-			locs = b.appendLocsForStack(locs[:0], stk)
-			if len(locs) > 0 {
-				break
-			}
-			hideRuntime = false // try again, and show all frames next time.
-		}
-
 		// do the delta
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
@@ -75,6 +52,29 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 
 		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
 			continue
+		}
+
+		hideRuntime := true
+		for tries := 0; tries < 2; tries++ {
+			stk := r.Stack()
+			// For heap profiles, all stack
+			// addresses are return PCs, which is
+			// what appendLocsForStack expects.
+			if hideRuntime {
+				for i, addr := range stk {
+					if f := runtime.FuncForPC(addr); f != nil && strings.HasPrefix(f.Name(), "runtime.") {
+						continue
+					}
+					// Found non-runtime. Show any runtime uses above it.
+					stk = stk[i:]
+					break
+				}
+			}
+			locs = b.appendLocsForStack(locs[:0], stk)
+			if len(locs) > 0 {
+				break
+			}
+			hideRuntime = false // try again, and show all frames next time.
 		}
 
 		b.pbSample(values, locs, func() {
