@@ -6,7 +6,6 @@ package pprof
 
 import (
 	"bytes"
-	"compress/gzip"
 	"io"
 	"os"
 	"runtime"
@@ -38,7 +37,7 @@ type profileBuilder struct {
 
 	// encoding state
 	w         io.Writer
-	zw        *gzip.Writer
+	zw        gzipWriter
 	pb        protobuf
 	strings   []string
 	stringMap map[string]int
@@ -264,7 +263,7 @@ type locInfo struct {
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
 func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions, mapping []memMap) *profileBuilder {
-	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	zw := newGzipWriter(w)
 	b := &profileBuilder{
 		w:         w,
 		zw:        zw,

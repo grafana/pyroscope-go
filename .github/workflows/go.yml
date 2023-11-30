@@ -21,6 +21,12 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
+      - name: Downgrade go.mod for go 1.17 and go 1.16
+        if:  matrix.go == '1.17' || matrix.go == '1.16'
+        run: make go/mod_16_for_testing
+      - name: Run go/mod
+        if:  matrix.go != '1.17' && matrix.go != '1.16'
+        run: make go/mod && git diff --exit-code
       - name: Install Go stable
         if: matrix.go == 'tip'
         uses: actions/setup-go@v4

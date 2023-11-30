@@ -5,3 +5,5 @@ go 1.17
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
 require github.com/grafana/pyroscope-go/godeltaprof v0.1.4
+
+require github.com/klauspost/compress v1.17.3 // indirect
