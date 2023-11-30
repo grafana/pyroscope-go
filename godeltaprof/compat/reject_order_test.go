@@ -40,7 +40,12 @@ func TestHeapReject(t *testing.T) {
 }
 
 func BenchmarkHeapRejectOrder(b *testing.B) {
-	dh := pprof.DeltaHeapProfiler{}
+	dh := pprof.DeltaHeapProfiler{
+		Options: pprof.ProfileBuilderOptions{
+			GenericsFrames: false,
+			LazyMapping:    true,
+		},
+	}
 	fs := generateMemProfileRecords(512, 32, 239)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -103,7 +108,12 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			dh := pprof.DeltaMutexProfiler{}
+			dh := pprof.DeltaMutexProfiler{
+				Options: pprof.ProfileBuilderOptions{
+					GenericsFrames: false,
+					LazyMapping:    true,
+				},
+			}
 			fs := generateBlockProfileRecords(512, 32, 239)
 			b.ResetTimer()
 

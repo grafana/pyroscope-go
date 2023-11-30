@@ -24,6 +24,7 @@ type ProfileBuilderOptions struct {
 	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]
 	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
 	GenericsFrames bool
+	LazyMapping    bool
 }
 
 // A profileBuilder writes a profile incrementally from a
@@ -261,7 +262,7 @@ type locInfo struct {
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
-func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions) *profileBuilder {
+func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions, mapping []memMap) *profileBuilder {
 	zw := newGzipWriter(w)
 	b := &profileBuilder{
 		w:         w,
@@ -273,7 +274,7 @@ func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions) *profileBuilder {
 		funcs:     map[string]int{},
 		opt:       opt,
 	}
-	b.readMapping()
+	b.mem = mapping
 	return b
 }
 
@@ -569,18 +570,30 @@ func (b *profileBuilder) emitLocation() uint64 {
 	return id
 }
 
-// readMapping reads /proc/self/maps and writes mappings to b.pb.
-// It saves the address ranges of the mappings in b.mem for use
-// when emitting locations.
-func (b *profileBuilder) readMapping() {
+func readMapping() []memMap {
 	data, _ := os.ReadFile("/proc/self/maps")
-	parseProcSelfMaps(data, b.addMapping)
-	if len(b.mem) == 0 { // pprof expects a map entry, so fake one.
-		b.addMappingEntry(0, 0, 0, "", "", true)
-		// TODO(hyangah): make addMapping return *memMap or
-		// take a memMap struct, and get rid of addMappingEntry
-		// that takes a bunch of positional arguments.
+	var mem []memMap
+	parseProcSelfMaps(data, func(lo, hi, offset uint64, file, buildID string) {
+		mem = append(mem, memMap{
+			start:   uintptr(lo),
+			end:     uintptr(hi),
+			offset:  offset,
+			file:    file,
+			buildID: buildID,
+			fake:    false,
+		})
+	})
+	if len(mem) == 0 { // pprof expects a map entry, so fake one.
+		mem = []memMap{{
+			start:   uintptr(0),
+			end:     uintptr(0),
+			offset:  0,
+			file:    "",
+			buildID: "",
+			fake:    true,
+		}}
 	}
+	return mem
 }
 
 var space = []byte(" ")
@@ -675,21 +688,6 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 		buildID, _ := elfBuildID(file)
 		addMapping(lo, hi, offset, file, buildID)
 	}
-}
-
-func (b *profileBuilder) addMapping(lo, hi, offset uint64, file, buildID string) {
-	b.addMappingEntry(lo, hi, offset, file, buildID, false)
-}
-
-func (b *profileBuilder) addMappingEntry(lo, hi, offset uint64, file, buildID string, fake bool) {
-	b.mem = append(b.mem, memMap{
-		start:   uintptr(lo),
-		end:     uintptr(hi),
-		offset:  offset,
-		file:    file,
-		buildID: buildID,
-		fake:    fake,
-	})
 }
 
 // Cut slices s around the first instance of sep,

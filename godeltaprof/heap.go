@@ -37,6 +37,7 @@ func NewHeapProfiler() *HeapProfiler {
 		impl: pprof.DeltaHeapProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: true,
+				LazyMapping:    true,
 			},
 		}}
 }
@@ -46,6 +47,7 @@ func NewHeapProfilerWithOptions(options ProfileOptions) *HeapProfiler {
 		impl: pprof.DeltaHeapProfiler{
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
+				LazyMapping:    options.LazyMappings,
 			},
 		}}
 }

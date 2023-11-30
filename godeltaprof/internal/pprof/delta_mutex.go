@@ -7,6 +7,7 @@ import (
 
 type DeltaMutexProfiler struct {
 	m       profMap
+	mem     []memMap
 	Options ProfileBuilderOptions
 }
 
@@ -16,8 +17,11 @@ type DeltaMutexProfiler struct {
 // and the number of cycles for block, contention profiles.
 // Possible 'scaler' functions are scaleBlockProfile and scaleMutexProfile.
 func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycleName string, scaler MutexProfileScaler, records []runtime.BlockProfileRecord) error {
+	if d.mem == nil || !d.Options.LazyMapping {
+		d.mem = readMapping()
+	}
 	// Output profile in protobuf form.
-	b := newProfileBuilder(w, d.Options)
+	b := newProfileBuilder(w, d.Options, d.mem)
 	b.pbValueType(tagProfile_PeriodType, countName, "count")
 	b.pb.int64Opt(tagProfile_Period, 1)
 	b.pbValueType(tagProfile_SampleType, countName, "count")
