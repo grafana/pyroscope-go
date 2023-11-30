@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/klauspost/compress/gzip"
 )
 
 // lostProfileEvent is the function to which lost profiling
@@ -38,7 +36,7 @@ type profileBuilder struct {
 
 	// encoding state
 	w         io.Writer
-	zw        *gzip.Writer
+	zw        gzipWriter
 	pb        protobuf
 	strings   []string
 	stringMap map[string]int
@@ -264,7 +262,7 @@ type locInfo struct {
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
 func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions) *profileBuilder {
-	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	zw := newGzipWriter(w)
 	b := &profileBuilder{
 		w:         w,
 		zw:        zw,
