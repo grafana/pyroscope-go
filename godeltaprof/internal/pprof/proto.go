@@ -6,13 +6,14 @@ package pprof
 
 import (
 	"bytes"
-	"compress/gzip"
 	"io"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 // lostProfileEvent is the function to which lost profiling
