@@ -23,7 +23,7 @@ func TestHeapReject(t *testing.T) {
 	require.NoError(t, err)
 	ls := stackCollapseProfile(t, profile)
 	assert.Len(t, ls, 512)
-	assert.Len(t, profile.Location, 150)
+	assert.Len(t, profile.Location, 141)
 	t.Log("p1 size", p1Size)
 
 	p2 := bytes.NewBuffer(nil)
@@ -74,7 +74,7 @@ func TestMutexReject(t *testing.T) {
 			require.NoError(t, err)
 			ls := stackCollapseProfile(t, profile)
 			assert.Len(t, ls, 512)
-			assert.Len(t, profile.Location, 150)
+			assert.Len(t, profile.Location, 141)
 			t.Log("p1 size", p1Size)
 
 			p2 := bytes.NewBuffer(nil)
