@@ -1,6 +1,6 @@
 module github.com/grafana/pyroscope-go
 
-go 1.17
+go 1.18
 
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
