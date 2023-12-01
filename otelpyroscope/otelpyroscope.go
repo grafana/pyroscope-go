@@ -81,6 +81,15 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 		ctx = withRootSpan(ctx, rs)
 	}
 
+	// We mark spans with "pyroscope.profile.id" attribute,
+	// only if they _can_ have profiles. Presence of the attribute
+	// does not indicate the fact that we actually have collected
+	// any samples for the span.
+	if (w.p.config.spanIDScope == scopeRootSpan && spanID == rs.id) ||
+		w.p.config.spanIDScope == scopeAllSpans {
+		span.SetAttributes(profileIDSpanAttributeKey.String(spanID))
+	}
+
 	// We can't skip labeling goroutines, even if we use the
 	// parent's attributes, because the root span can finish
 	// before all the descendants started (and inherited the
@@ -92,21 +101,11 @@ func (w *profileTracer) Start(ctx context.Context, spanName string, opts ...trac
 		}
 		labels = append(labels, spanNameLabelName, spanName)
 	}
-
 	if addSpanIDLabel {
 		if w.p.config.spanIDScope == scopeRootSpan {
 			spanID = rs.id
 		}
 		labels = append(labels, spanIDLabelName, spanID)
-	}
-
-	// We mark spans with "pyroscope.profile.id" attribute,
-	// only if they _can_ have profiles. Presence of the attribute
-	// does not indicate the fact that we actually have collected
-	// any samples for the span.
-	if (w.p.config.spanIDScope == scopeRootSpan && spanID == rs.id) ||
-		w.p.config.spanIDScope == scopeAllSpans {
-		span.SetAttributes(profileIDSpanAttributeKey.String(spanID))
 	}
 
 	ctx = pprof.WithLabels(ctx, pprof.Labels(labels...))
