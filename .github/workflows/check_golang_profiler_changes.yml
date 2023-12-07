@@ -8,6 +8,7 @@ on:
 jobs:
   check_golang_profiler_changes:
     runs-on: ubuntu-latest
+    if: github.repository == 'grafana/pyroscope-go' # avoid running on forks
     steps:
       - name: Checkout
         uses: actions/checkout@v2
