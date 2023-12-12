@@ -68,24 +68,24 @@ BenchmarkGodeltaprof - does not dump profile with runtime/pprof, computes delta,
 Each benchmark also outputs produced profile sizes.
 ```
 BenchmarkOG
-       3	 703322458 ns/op
-profile sizes: [211872 212311 212039 212915 213467 214227 214152 214235 216195 217801 217875 218251 218094 218079 218157]
+      63         181862189 ns/op
+profile sizes: [209117 209107 209077 209089 209095 209076 209088 209082 209090 209092]
 
 BenchmarkFastDelta
-       2	 603072104 ns/op
-profile sizes: [173458 47415 43212 48645 49923 42830 14556 15618 21177 24979 20851 18199 13250 13198 13577]
+      43         273936764 ns/op
+profile sizes: [169300 10815 8969 9511 9752 9376 9545 8959 10357 9536]
 
 BenchmarkGodeltaprof
-      15	  92276847 ns/op
-profile sizes: [218803 56600 52205 58711 60330 51712 15659 16926 24197 28538 23579 20280 14199 14367 14627]
+     366          31148264 ns/op
+profile sizes: [208898 11485 9347 9967 10291 9848 10085 9285 11033 9986]
 ```
 
-Notice how BenchmarkOG profiles are ~200k and BenchmarkGodeltaprof and BenchmarkFastDelta are ~14k - that is because a lof of samples
+Notice how BenchmarkOG profiles sizes are ~200k and BenchmarkGodeltaprof and BenchmarkFastDelta are ~10k - that is because a lof of samples
 with zero values are discarded after delta computation.
 
 Source code of benchmarks could be found [here](https://github.com/grafana/pyroscope/compare/godeltaprofbench?expand=1) 
 
-CPU profiles: [BenchmarkOG](https://flamegraph.com/share/665822d1-9819-11ee-a502-466f68d203a5), [BenchmarkFastDelta](https://flamegraph.com/share/b06774de-9819-11ee-9a0d-f2c25703e557),  [BenchmarkGodeltaprof]( https://flamegraph.com/share/192c77c5-9819-11ee-a502-466f68d203a5)
+CPU profiles: [BenchmarkOG](https://flamegraph.com/share/a8f68312-98c7-11ee-a502-466f68d203a5), [BenchmarkFastDelta](https://flamegraph.com/share/c23821f3-98c7-11ee-a502-466f68d203a5),  [BenchmarkGodeltaprof]( https://flamegraph.com/share/ea66df36-98c7-11ee-9a0d-f2c25703e557)
 
 
 
