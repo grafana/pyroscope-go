@@ -16,13 +16,13 @@ go tool pprof http://localhost:6060/debug/pprof/heap?seconds=30
 ```
 
 What this does:
-1. dump profile p0
-2. sleep
-3. dump profile p1
-4. decompress and parse protobuf p0
-5. decompress and parse protobuf p1
-6. subtract p0 from p1
-7. serialize protobuf and compress the result
+1. Dump profile `p0`
+2. Sleep
+3. Dump profile `p1`
+4. Decompress and parse protobuf `p0`
+5. Decompress and parse protobuf `p1`
+6. Subtract `p0` from `p1`
+7. Serialize protobuf and compress the result
 
 The resulting profile is *usually* much smaller(p0 may be megabytes, while result is usually tens of kilobytes).
 
