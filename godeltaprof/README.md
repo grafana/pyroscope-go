@@ -49,12 +49,12 @@ godeltaprof does a similar job but slightly differently.
 Delta computation happens before serializing any pprof files using `runtime.MemprofileRecord` and `BlockProfileRecord`.
 This way, huge profiles don't need to be parsed. The delta is computed on raw records, all zeros are rejected, and results are serialized and compressed.
 
-The source code for godeltaprof is based(forked) on the original [runtime/pprof package](https://github.com/golang/go/tree/master/src/runtime/pprof)  .
-It is modified to include delta computation before serialization and to expose the new endpoints.
-There are other small improvements/benefits:
-- using `github.com/klauspost/compress/gzip` instead of `compress/gzip`
-- optional lazy mappings reading (they don't change over time for most applications)
-- it is a separate package from runtime, so we can update it independently of 
+The source code for godeltaprof is based (forked) on the original [runtime/pprof package](https://github.com/golang/go/tree/master/src/runtime/pprof).
+godeltaprof is modified to include delta computation before serialization and to expose the new endpoints.
+There are other small improvements and benefits:
+- Using `github.com/klauspost/compress/gzip` instead of `compress/gzip`
+- Optional lazy mappings reading (they don't change over time for most applications)
+- Separate package from runtime, so updated independently 
 
 # benchmarks
 
