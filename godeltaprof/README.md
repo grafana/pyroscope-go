@@ -1,6 +1,6 @@
 # godeltaprof
 
-godeltaprof is an efficient delta profiler for memory, mutex, block.
+godeltaprof is an efficient delta profiler for memory, mutex, and block.
 
 # Why
 
