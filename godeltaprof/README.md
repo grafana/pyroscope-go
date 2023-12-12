@@ -7,9 +7,9 @@ godeltaprof is an efficient delta profiler for memory, mutex, and block.
 In Golang, allocation, mutex and block profiles are cumulative. They only grow over time and show allocations that happened since the beginning of the running program.
 Not only values grow, but the size of the profile itself grows as well. It could grow up to megabytes in size for long-running processes. These megabytes profiles are called huge profiles in this document.
 
-In many cases it is much more useful to see the difference between two points in time.
-
-There is a way to do it with the original runtime/pprof package, they call it delta profile, it requires passing seconds argument to pprof endpoint query.
+In many cases, it's more useful to see the differences between two points in time.
+You can use the original runtime/pprof package, called a delta profile, to see these differences. 
+Using the delta profile requires passing seconds argument to the pprof endpoint query.
 
 ```
 go tool pprof http://localhost:6060/debug/pprof/heap?seconds=30
