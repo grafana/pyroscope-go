@@ -46,9 +46,8 @@ However, the fastdelta profiler still parses huge profiles up to megabytes, just
 
 godeltaprof does a similar job but slightly differently.
 
-The main difference is that delta computation happens before serializing any pprof files using `runtime.MemprofileRecord` and `BlockProfileRecord`
-This way we don't need to parse huge profiles, we compute the delta on raw records, reject all zeros and serialize and compress the result.
-We dont parse huge profiles, we serialize and compress only small delta profiles.
+Delta computation happens before serializing any pprof files using `runtime.MemprofileRecord` and `BlockProfileRecord`.
+This way, huge profiles don't need to be parsed. The delta is computed on raw records, all zeros are rejected, and results are serialized and compressed.
 
 The source code for godeltaprof is based(forked) on the original [runtime/pprof package](https://github.com/golang/go/tree/master/src/runtime/pprof)  .
 It is modified to include delta computation before serialization and to expose the new endpoints.
