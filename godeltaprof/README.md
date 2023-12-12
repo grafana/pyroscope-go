@@ -35,12 +35,12 @@ Note: it can be fixed if runtime/pprof package would do the following `p0.ScaleN
 
 ## DataDog's fastdelta
 
-Another approach found is DataDog's [fastdelta profiler](https://github.com/DataDog/dd-trace-go/blob/30e1406c2cb62af749df03d559853e1d1de0e3bf/profiler/internal/fastdelta/fd.go#L75)
+DataDog's [fastdelta profiler](https://github.com/DataDog/dd-trace-go/blob/30e1406c2cb62af749df03d559853e1d1de0e3bf/profiler/internal/fastdelta/fd.go#L75) uses another approach. 
 
 It improves the runtime/pprof approach by keeping a copy of the previous profile and subtracting the current profile from it.
-It also does it in a more efficient way by using a custom protobuf pprof parser that doesn't allocate as much memory.
-So it is much faster and produces less garbage. Also does not require dumping two profiles.
-However, it still parses huge profiles up to megabytes, just to discard most of it.
+The fastdelta profiler uses a custom protobuf pprof parser that doesn't allocate as much memory.
+This approach is more efficient, faster, and produces less garbage. It also doesn't require using two profiles. 
+However, the fastdelta profiler still parses huge profiles up to megabytes, just to discard most of it.
 
 ## godeltaprof
 
