@@ -24,11 +24,12 @@ What this does:
 6. Subtract `p0` from `p1`
 7. Serialize protobuf and compress the result
 
-The resulting profile is *usually* much smaller(p0 may be megabytes, while result is usually tens of kilobytes).
+The resulting profile is *usually* much smaller (`p0` may be megabytes, while result is usually tens of kilobytes).
 
-There are number of issues with this approach.
-1. Heap profile contains both allocation values and inuse values. Inuse values are not cumulative. So inuse values are corrupted by the subtraction.
-Note: it can be fixed if runtime/pprof package would do the following `p0.ScaleN([]float64{-1,-1,0,0})` instead of `p0.Scale(-1)` - that would substract allocation values and zero out inuse values in p0.
+There are number of issues with this approach:
+
+1. Heap profile contains both allocation values and in-use values. In-use values are not cumulative. In-use values are corrupted by the subtraction.
+  **Note:** It can be fixed if runtime/pprof package uses `p0.ScaleN([]float64{-1,-1,0,0})`, instead of `p0.Scale(-1)` - that would subtract allocation values and zero out in-use values in `p0`.
 2. It requires dumping two profiles.
 3. It produces a lot of allocations putting pressure on GC.
 
