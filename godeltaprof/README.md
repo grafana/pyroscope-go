@@ -4,7 +4,7 @@ godeltaprof is an efficient delta profiler for memory, mutex, and block.
 
 # Why
 
-In golang, allocation, mutex and block profiles are cumulative - they only grow over time and show allocations happened since the beginning of the running program.
+In Golang, allocation, mutex and block profiles are cumulative. They only grow over time and show allocations that happened since the beginning of the running program.
 Not only values grow, but the size of the profile itself grows as well. It could grow up to megabytes in size for long-running processes. These megabytes profiles are called huge profiles in this document.
 
 In many cases it is much more useful to see the difference between two points in time.
