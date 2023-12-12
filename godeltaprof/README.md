@@ -58,7 +58,7 @@ There are other small improvements/benefits:
 
 # benchmarks
 
-I used memory profiles from [pyroscope](https://github.com/grafana/pyroscope) server.
+These benchmarks used memory profiles from the [pyroscope](https://github.com/grafana/pyroscope) server.
 
 BenchmarkOG - dumps memory profile with runtime/pprof package
 BenchmarkFastDelta - dumps memory profile with runtime/pprof package and computes delta using fastdelta
