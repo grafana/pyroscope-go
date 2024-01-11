@@ -1,8 +1,5 @@
 GO_VERSION_PRE20 := $(shell go version  | awk '{print $$3}' | awk -F '.' '{print ($$1 == "go1" && int($$2) < 20)}')
 TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/...
-ifeq ($(GO_VERSION_PRE20),0)
-	TEST_PACKAGES += ./otelpyroscope/...
-endif
 
 .PHONY: test
 test:
