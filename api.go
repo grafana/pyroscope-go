@@ -23,11 +23,12 @@ type Config struct {
 	ProfileTypes      []ProfileType
 	DisableGCRuns     bool // this will disable automatic runtime.GC runs between getting the heap profiles
 	HTTPHeaders       map[string]string
-	// Deprecated: the field will be removed in future releases.
-	// DisableAutomaticResets is ignored.
-	DisableAutomaticResets bool
+
 	// Deprecated: the field will be removed in future releases.
 	// Use UploadRate instead.
+	DisableAutomaticResets bool
+	// Deprecated: the field will be removed in future releases.
+	// DisableCumulativeMerge is ignored.
 	DisableCumulativeMerge bool
 	// Deprecated: the field will be removed in future releases.
 	// SampleRate is set to 100 and is not configurable.
