@@ -11,6 +11,10 @@ import (
 	"github.com/grafana/pyroscope-go/internal/pprof"
 )
 
+func init() {
+	http.HandleFunc("/debug/pprof/profile", Profile)
+}
+
 // Profile responds with the pprof-formatted cpu profile.
 // Profiling lasts for duration specified in seconds GET parameter, or for 30 seconds if not specified.
 // The package initialization registers it as /debug/pprof/profile.
