@@ -80,6 +80,7 @@ func newCPUProfileCollector(
 }
 
 func (c *cpuProfileCollector) Start() {
+	c.logger.Debugf("starting cpu profile collector")
 	// From now on, internal pprof.StartCPUProfile
 	// is handled by this collector.
 	internal.SetCollector(c)
@@ -99,7 +100,7 @@ func (c *cpuProfileCollector) Start() {
 			if d := n.Sub(c.timeStarted); d < c.dur {
 				if d < 0 {
 					// Ticker fired after the StartCPUProfile
-					// call, which interrupted background
+					// call, that interrupted background
 					// profiling.
 					d = c.dur
 				}
@@ -168,15 +169,17 @@ func (c *cpuProfileCollector) handleEvent(e event) {
 }
 
 func (c *cpuProfileCollector) Stop() {
+	c.logger.Debugf("stopping cpu profile collector")
 	// Switches back to the standard pprof collector.
 	// If internal pprof.StartCPUProfile is called,
 	// the function blocks until StopCPUProfile.
-	internal.ResetCollector()
+	internal.SetCollector(c.collector)
 	// Note that "halt" is not an event, but rather state
 	// of the collector: the channel can be read multiple
 	// times before the collector stops.
 	close(c.halt)
 	<-c.done
+	c.logger.Debugf("stopping cpu profile collector stopped")
 }
 
 func (c *cpuProfileCollector) StartCPUProfile(w io.Writer) error {
@@ -185,6 +188,7 @@ func (c *cpuProfileCollector) StartCPUProfile(w io.Writer) error {
 }
 
 func (c *cpuProfileCollector) StopCPUProfile() {
+	c.logger.Debugf("cpu profile collector restored")
 	_ = newEvent(stopEvent).send(c.events)
 }
 

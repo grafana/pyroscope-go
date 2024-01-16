@@ -54,7 +54,7 @@ func collectCPUProfile(ctx context.Context, w io.Writer) error {
 	if err := internal.StartCPUProfile(w); err != nil {
 		return err
 	}
-	defer internal.StopCPUProfile()
 	<-ctx.Done()
+	internal.StopCPUProfile()
 	return nil
 }
