@@ -8,12 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/pyroscope-go/internal/pprof"
+	internal "github.com/grafana/pyroscope-go/internal/pprof"
 )
-
-func init() {
-	http.HandleFunc("/debug/pprof/profile", Profile)
-}
 
 // Profile responds with the pprof-formatted cpu profile.
 // Profiling lasts for duration specified in seconds GET parameter, or for 30 seconds if not specified.
@@ -55,10 +51,10 @@ func serveError(w http.ResponseWriter, status int, txt string) {
 }
 
 func collectCPUProfile(ctx context.Context, w io.Writer) error {
-	defer pprof.StopCPUProfile()
-	if err := pprof.StartCPUProfile(w); err != nil {
+	if err := internal.StartCPUProfile(w); err != nil {
 		return err
 	}
+	defer internal.StopCPUProfile()
 	<-ctx.Done()
 	return nil
 }

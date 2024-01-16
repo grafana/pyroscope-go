@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"runtime/pprof"
 	"time"
 
 	internal "github.com/grafana/pyroscope-go/internal/pprof"
@@ -12,10 +11,14 @@ import (
 )
 
 type cpuProfileCollector struct {
-	name        string
-	dur         time.Duration
+	name string
+	dur  time.Duration
+
+	upstream  upstream.Upstream
+	collector internal.Collector
+	logger    Logger
+
 	buf         *bytes.Buffer
-	upstream    upstream.Upstream
 	timeStarted time.Time
 
 	// started indicates whether the collector
@@ -42,7 +45,7 @@ const (
 )
 
 func newEvent(typ eventType) event {
-	return event{typ: typ, done: make(chan error)}
+	return event{typ: typ, done: make(chan error, 1)}
 }
 
 func (e event) send(c chan<- event) error {
@@ -59,17 +62,20 @@ func newStartEvent(w io.Writer) event {
 func newCPUProfileCollector(
 	name string,
 	upstream upstream.Upstream,
+	logger Logger,
 	period time.Duration,
 ) *cpuProfileCollector {
 	buf := bytes.NewBuffer(make([]byte, 0, 1<<10))
 	return &cpuProfileCollector{
-		name:     name,
-		dur:      period,
-		buf:      buf,
-		upstream: upstream,
-		events:   make(chan event),
-		halt:     make(chan struct{}),
-		done:     make(chan struct{}),
+		name:      name,
+		dur:       period,
+		upstream:  upstream,
+		logger:    logger,
+		collector: internal.DefaultCollector(),
+		buf:       buf,
+		events:    make(chan event),
+		halt:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}
 }
 
@@ -91,6 +97,12 @@ func (c *cpuProfileCollector) Start() {
 			// which may happen if the collector has been
 			// interrupted and then resumed, or flushed.
 			if d := n.Sub(c.timeStarted); d < c.dur {
+				if d < 0 {
+					// Ticker fired after the StartCPUProfile
+					// call, which interrupted background
+					// profiling.
+					d = c.dur
+				}
 				t.Reset(d)
 				continue
 			}
@@ -109,7 +121,7 @@ func (c *cpuProfileCollector) Start() {
 				// StartCPUProfile and StopCPUProfile calls.
 				continue
 			}
-			pprof.StopCPUProfile()
+			c.collector.StopCPUProfile()
 			c.upload()
 			close(c.done)
 			return
@@ -135,8 +147,8 @@ func (c *cpuProfileCollector) handleEvent(e event) {
 			err = fmt.Errorf("cpu profiling already started")
 		} else {
 			err = c.reset(e.w)
+			c.started = err == nil
 		}
-		c.started = err == nil
 
 	case stopEvent:
 		if c.started {
@@ -168,6 +180,7 @@ func (c *cpuProfileCollector) Stop() {
 }
 
 func (c *cpuProfileCollector) StartCPUProfile(w io.Writer) error {
+	c.logger.Debugf("cpu profile collector interrupted with StartCPUProfile")
 	return newStartEvent(w).send(c.events)
 }
 
@@ -180,7 +193,7 @@ func (c *cpuProfileCollector) Flush() error {
 }
 
 func (c *cpuProfileCollector) reset(w io.Writer) error {
-	pprof.StopCPUProfile()
+	c.collector.StopCPUProfile()
 	c.upload()
 	var d io.Writer = c.buf
 	if w != nil {
@@ -189,7 +202,8 @@ func (c *cpuProfileCollector) reset(w io.Writer) error {
 		d = io.MultiWriter(d, w)
 	}
 	c.timeStarted = time.Now()
-	if err := pprof.StartCPUProfile(d); err != nil {
+	if err := c.collector.StartCPUProfile(d); err != nil {
+		c.logger.Errorf("failed to start CPU profiling: %v", err)
 		c.timeStarted = time.Time{}
 		c.buf.Reset()
 		return err
@@ -201,16 +215,20 @@ func (c *cpuProfileCollector) upload() {
 	if c.timeStarted.IsZero() {
 		return
 	}
+	buf := c.buf.Bytes()
+	if len(buf) == 0 {
+		return
+	}
 	c.upstream.Upload(&upstream.UploadJob{
 		Name:            c.name,
 		StartTime:       c.timeStarted,
 		EndTime:         time.Now(),
 		SpyName:         "gospy",
-		SampleRate:      100,
+		SampleRate:      DefaultSampleRate,
 		Units:           "samples",
 		AggregationType: "sum",
 		Format:          upstream.FormatPprof,
-		Profile:         copyBuf(c.buf.Bytes()),
+		Profile:         copyBuf(buf),
 	})
 	c.buf.Reset()
 }

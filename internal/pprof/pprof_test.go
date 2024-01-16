@@ -23,3 +23,13 @@ func Test_SetCollector(t *testing.T) {
 		}
 	}
 }
+
+func Test_DefaultCollector(t *testing.T) {
+	if err := StartCPUProfile(io.Discard); err != nil {
+		t.Fatalf("Default collector StartCPUProfile: %v", err)
+	}
+	if err := StartCPUProfile(io.Discard); err == nil {
+		t.Fatalf("Default collector must fail on consecuitive StartCPUProfile")
+	}
+	StopCPUProfile()
+}

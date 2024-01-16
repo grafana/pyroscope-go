@@ -18,6 +18,8 @@ type Collector interface {
 	StopCPUProfile()
 }
 
+func DefaultCollector() Collector { return defaultCollector{} }
+
 type defaultCollector struct{}
 
 func (c defaultCollector) StartCPUProfile(w io.Writer) error { return pprof.StartCPUProfile(w) }

@@ -110,7 +110,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		deltaBlock: godeltaprof.NewBlockProfiler(),
 		deltaMutex: godeltaprof.NewMutexProfiler(),
 		deltaHeap:  godeltaprof.NewHeapProfiler(),
-		cpu:        newCPUProfileCollector(appName, c.Upstream, c.UploadRate),
+		cpu:        newCPUProfileCollector(appName, c.Upstream, c.Logger, c.UploadRate),
 	}
 
 	return ps, nil
