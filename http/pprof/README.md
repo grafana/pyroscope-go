@@ -9,7 +9,7 @@ is already started:
 
 > Could not enable CPU profiling: CPU profiling already in use
 
-The Pyroscope CPU Profiler HTTP handler handles this gracefully by communicating with
+The Pyroscope CPU Profiler HTTP handler serve this gracefully by communicating with
 the Pyroscope profiler, which collects profiles in the background.
 
 ## Usage
@@ -31,3 +31,7 @@ func main() {
 	http.Handle("/debug/pprof/cpu", pprof.Profile())
 }
 ```
+
+With each invocation of the handler, it suspends the Pyroscope profiler, gathers a CPU
+profile, dispatches the collected profile to both the caller and the Pyroscope profiler,
+and subsequently resumes the profiler.
