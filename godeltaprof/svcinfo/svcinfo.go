@@ -39,12 +39,8 @@ func GetServiceVersion() ServiceVersion {
 		it, ok := debug.ReadBuildInfo()
 		if it != nil && ok {
 			info.Repository = it.Path
-			info.GoVersion = it.GoVersion
-			for _, setting := range it.Settings {
-				if setting.Key == "vcs.revision" {
-					info.GitRef = setting.Value
-				}
-			}
+			info.GoVersion = runtime.Version()
+
 			for _, dep := range it.Deps {
 				if dep.Path == "github.com/grafana/pyroscope-go" {
 					info.PyroscopeSDKVersion = dep.Version
@@ -65,9 +61,6 @@ func GetServiceVersion() ServiceVersion {
 		}
 		if rev := os.Getenv(EnvServiceVCSRevision); rev != "" {
 			info.GitRef = rev
-		}
-		if info.GoVersion == "" {
-			info.GoVersion = runtime.Version()
 		}
 	})
 	return info
