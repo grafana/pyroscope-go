@@ -59,6 +59,7 @@ func NewMutexProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
 				LazyMapping:    options.LazyMappings,
+				ServiceVersion: options.BuildInfo,
 			},
 		},
 	}
@@ -93,6 +94,7 @@ func NewBlockProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
 				LazyMapping:    options.LazyMappings,
+				ServiceVersion: options.BuildInfo,
 			},
 		},
 	}

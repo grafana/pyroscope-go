@@ -19,6 +19,7 @@ type DeltaMutexProfiler struct {
 func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycleName string, scaler MutexProfileScaler, records []runtime.BlockProfileRecord) error {
 	if d.mem == nil || !d.Options.LazyMapping {
 		d.mem = readMapping()
+		injectServiceVersion(d.Options.ServiceVersion, d.mem)
 	}
 	// Output profile in protobuf form.
 	b := newProfileBuilder(w, d.Options, d.mem)

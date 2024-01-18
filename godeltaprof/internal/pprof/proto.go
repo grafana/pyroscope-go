@@ -6,12 +6,15 @@ package pprof
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/grafana/pyroscope-go/godeltaprof/svcinfo"
 )
 
 // lostProfileEvent is the function to which lost profiling
@@ -25,6 +28,7 @@ type ProfileBuilderOptions struct {
 	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
 	GenericsFrames bool
 	LazyMapping    bool
+	ServiceVersion svcinfo.ServiceVersion
 }
 
 // A profileBuilder writes a profile incrementally from a
@@ -594,6 +598,20 @@ func readMapping() []memMap {
 		}}
 	}
 	return mem
+}
+
+func injectServiceVersion(v svcinfo.ServiceVersion, maps []memMap) {
+	def := svcinfo.ServiceVersion{}
+	if v != def {
+		for _, m := range maps {
+			v.BuildID = m.buildID
+			versionString, err := json.Marshal(v)
+			if err != nil {
+				continue
+			}
+			m.buildID = string(versionString)
+		}
+	}
 }
 
 var space = []byte(" ")

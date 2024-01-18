@@ -17,6 +17,7 @@ type DeltaHeapProfiler struct {
 func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
 	if d.mem == nil || !d.Options.LazyMapping {
 		d.mem = readMapping()
+		injectServiceVersion(d.Options.ServiceVersion, d.mem)
 	}
 	b := newProfileBuilder(w, d.Options, d.mem)
 	b.pbValueType(tagProfile_PeriodType, "space", "bytes")
