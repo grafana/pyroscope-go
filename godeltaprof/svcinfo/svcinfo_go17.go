@@ -3,6 +3,8 @@
 
 package svcinfo
 
+import "runtime/debug"
+
 func gitRef(_ *debug.BuildInfo) string {
 	return ""
 }
