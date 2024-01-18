@@ -603,13 +603,13 @@ func readMapping() []memMap {
 func injectServiceVersion(v svcinfo.ServiceVersion, maps []memMap) {
 	def := svcinfo.ServiceVersion{}
 	if v != def {
-		for _, m := range maps {
-			v.BuildID = m.buildID
+		for i := range maps {
+			v.BuildID = maps[i].buildID
 			versionString, err := json.Marshal(v)
 			if err != nil {
 				continue
 			}
-			m.buildID = string(versionString)
+			maps[i].buildID = string(versionString)
 		}
 	}
 }
