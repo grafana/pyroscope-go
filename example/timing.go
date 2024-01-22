@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/pyroscope-io/client/pyroscope"
+	"github.com/grafana/pyroscope-go"
 )
 
 //go:noinline
