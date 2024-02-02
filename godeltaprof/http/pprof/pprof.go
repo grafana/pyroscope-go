@@ -8,12 +8,13 @@ import (
 	"strconv"
 
 	"github.com/grafana/pyroscope-go/godeltaprof"
+	"github.com/grafana/pyroscope-go/godeltaprof/svcinfo"
 )
 
 var (
-	deltaHeapProfiler  = godeltaprof.NewHeapProfiler()
-	deltaBlockProfiler = godeltaprof.NewBlockProfiler()
-	deltaMutexProfiler = godeltaprof.NewMutexProfiler()
+	deltaHeapProfiler  *godeltaprof.HeapProfiler
+	deltaBlockProfiler *godeltaprof.BlockProfiler
+	deltaMutexProfiler *godeltaprof.BlockProfiler
 )
 
 type deltaProfiler interface {
@@ -21,6 +22,14 @@ type deltaProfiler interface {
 }
 
 func init() {
+	opt := godeltaprof.ProfileOptions{
+		GenericsFrames: true,
+		LazyMappings:   true,
+		BuildInfo:      svcinfo.GetServiceVersion(),
+	}
+	deltaHeapProfiler = godeltaprof.NewHeapProfilerWithOptions(opt)
+	deltaBlockProfiler = godeltaprof.NewBlockProfilerWithOptions(opt)
+	deltaMutexProfiler = godeltaprof.NewMutexProfilerWithOptions(opt)
 	http.HandleFunc("/debug/pprof/delta_heap", Heap)
 	http.HandleFunc("/debug/pprof/delta_block", Block)
 	http.HandleFunc("/debug/pprof/delta_mutex", Mutex)

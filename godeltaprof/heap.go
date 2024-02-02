@@ -48,6 +48,7 @@ func NewHeapProfilerWithOptions(options ProfileOptions) *HeapProfiler {
 			Options: pprof.ProfileBuilderOptions{
 				GenericsFrames: options.GenericsFrames,
 				LazyMapping:    options.LazyMappings,
+				ServiceVersion: options.BuildInfo,
 			},
 		}}
 }
