@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/grafana/pyroscope-go/internal/fgprof"
 	"github.com/grafana/pyroscope-go/upstream"
-	"github.com/grafana/pyroscope-io/fgprof"
 )
 
 type wallClockProfileCollector struct {

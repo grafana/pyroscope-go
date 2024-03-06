@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/pprof/profile"
+	"github.com/google/pprof/profile" // TODO: Get rid of the dependency.
 )
 
 func Start(w io.Writer) func() error {

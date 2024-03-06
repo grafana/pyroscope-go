@@ -4,5 +4,4 @@ use (
 	.
 	godeltaprof
 	godeltaprof/compat
-	internal/fgprof
 )
