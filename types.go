@@ -13,6 +13,7 @@ type Logger interface {
 
 const (
 	ProfileCPU           ProfileType = "cpu"
+	ProfileWallClockTime ProfileType = "wall_clock_time"
 	ProfileInuseObjects  ProfileType = "inuse_objects"
 	ProfileAllocObjects  ProfileType = "alloc_objects"
 	ProfileInuseSpace    ProfileType = "inuse_space"

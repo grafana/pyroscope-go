@@ -25,22 +25,24 @@ var m sync.Mutex
 func fastFunction(c context.Context, wg *sync.WaitGroup) {
 	m.Lock()
 	defer m.Unlock()
-
 	pyroscope.TagWrapper(c, pyroscope.Labels("function", "fast"), func(c context.Context) {
-		work(200000000)
+		go func() {
+			defer wg.Done()
+			work(200000000)
+		}()
 	})
-	wg.Done()
 }
 
 func slowFunction(c context.Context, wg *sync.WaitGroup) {
 	m.Lock()
 	defer m.Unlock()
-
 	// standard pprof.Do wrappers work as well
 	pprof.Do(c, pprof.Labels("function", "slow"), func(c context.Context) {
-		work(800000000)
+		go func() {
+			wg.Done()
+			work(800000000)
+		}()
 	})
-	wg.Done()
 }
 
 func main() {
@@ -56,6 +58,7 @@ func main() {
 		BasicAuthPassword: os.Getenv("PYROSCOPE_BASIC_AUTH_PASSWORD"),
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
+			pyroscope.ProfileWallClockTime,
 			pyroscope.ProfileInuseObjects,
 			pyroscope.ProfileAllocObjects,
 			pyroscope.ProfileInuseSpace,
@@ -73,8 +76,8 @@ func main() {
 		for {
 			wg := sync.WaitGroup{}
 			wg.Add(2)
-			go fastFunction(c, &wg)
-			go slowFunction(c, &wg)
+			fastFunction(c, &wg)
+			slowFunction(c, &wg)
 			wg.Wait()
 		}
 	})

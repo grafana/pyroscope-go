@@ -44,6 +44,7 @@ type Session struct {
 	deltaMutex *godeltaprof.BlockProfiler
 	deltaHeap  *godeltaprof.HeapProfiler
 	cpu        *cpuProfileCollector
+	wallClock  *wallClockProfileCollector
 }
 
 type SessionConfig struct {
@@ -111,6 +112,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		deltaMutex: godeltaprof.NewMutexProfiler(),
 		deltaHeap:  godeltaprof.NewHeapProfiler(),
 		cpu:        newCPUProfileCollector(appName, c.Upstream, c.Logger, c.UploadRate),
+		wallClock:  newWallClockProfileCollector(appName, c.Upstream, c.Logger, c.UploadRate),
 	}
 
 	return ps, nil
@@ -155,13 +157,21 @@ func (ps *Session) takeSnapshots() {
 
 		case f := <-ps.flushCh:
 			ps.reset(ps.startTime, ps.truncatedTime())
-			_ = ps.cpu.Flush()
+			if ps.isCPUEnabled() {
+				_ = ps.cpu.Flush()
+			}
+			if ps.isWallClockEnabled() {
+				_ = ps.wallClock.Flush()
+			}
 			ps.upstream.Flush()
 			f.wg.Done()
 
 		case <-ps.stopCh:
 			if ps.isCPUEnabled() {
 				ps.cpu.Stop()
+			}
+			if ps.isWallClockEnabled() {
+				ps.wallClock.Stop()
 			}
 			return
 		}
@@ -192,6 +202,14 @@ func (ps *Session) Start() error {
 		}()
 	}
 
+	if ps.isWallClockEnabled() {
+		ps.wg.Add(1)
+		go func() {
+			defer ps.wg.Done()
+			ps.wallClock.Start()
+		}()
+	}
+
 	return nil
 }
 
@@ -204,6 +222,14 @@ func (ps *Session) isCPUEnabled() bool {
 	return false
 }
 
+func (ps *Session) isWallClockEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileWallClockTime {
+			return true
+		}
+	}
+	return false
+}
 func (ps *Session) isMemEnabled() bool {
 	for _, t := range ps.profileTypes {
 		if t == ProfileInuseObjects || t == ProfileAllocObjects || t == ProfileInuseSpace || t == ProfileAllocSpace {
