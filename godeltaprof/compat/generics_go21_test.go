@@ -200,20 +200,29 @@ func TestMutex(t *testing.T) {
 	})
 }
 
-func profileToString(p *profile.Profile) []string {
+func profileToStrings(p *profile.Profile) []string {
 	var res []string
 	for _, s := range p.Sample {
-		var funcs []string
-		for i := len(s.Location) - 1; i >= 0; i-- {
-			loc := s.Location[i]
-			for j := len(loc.Line) - 1; j >= 0; j-- {
-				line := loc.Line[j]
-				funcs = append(funcs, line.Function.Name)
-			}
-		}
-		res = append(res, fmt.Sprintf("%s %v", strings.Join(funcs, ";"), s.Value))
+		res = append(res, sampleToString(s))
 	}
 	return res
+}
+
+func sampleToString(s *profile.Sample) string {
+	var funcs []string
+	for i := len(s.Location) - 1; i >= 0; i-- {
+		loc := s.Location[i]
+		funcs = locationToStrings(loc, funcs)
+	}
+	return fmt.Sprintf("%s %v", strings.Join(funcs, ";"), s.Value)
+}
+
+func locationToStrings(loc *profile.Location, funcs []string) []string {
+	for j := range loc.Line {
+		line := loc.Line[len(loc.Line)-1-j]
+		funcs = append(funcs, line.Function.Name)
+	}
+	return funcs
 }
 
 // This is a regression test for https://go.dev/issue/64528 .
@@ -232,7 +241,7 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 
 	runtime.GC()
 	buf := bytes.NewBuffer(nil)
-	if err := writeHeapProfile(buf); err != nil {
+	if err := WriteHeapProfile(buf); err != nil {
 		t.Fatalf("writing profile: %v", err)
 	}
 	p, err := profile.Parse(buf)
@@ -240,7 +249,7 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 		t.Fatalf("profile.Parse: %v", err)
 	}
 
-	actual := profileToString(p)
+	actual := profileToStrings(p)
 	expected := []string{
 		"testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestGenericsHashKeyInPprofBuilder;github.com/grafana/pyroscope-go/godeltaprof/compat.genericAllocFunc[go.shape.uint32] [1 128 0 0]",
 		"testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestGenericsHashKeyInPprofBuilder;github.com/grafana/pyroscope-go/godeltaprof/compat.genericAllocFunc[go.shape.uint32] [1 256 0 0]",
@@ -255,7 +264,84 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 	}
 }
 
-func writeHeapProfile(w io.Writer) error {
+type opAlloc struct {
+	buf [128]byte
+}
+
+type opCall struct {
+}
+
+var sink []byte
+
+func storeAlloc() {
+	sink = make([]byte, 16)
+}
+
+func nonRecursiveGenericAllocFunction[CurrentOp any, OtherOp any](alloc bool) {
+	if alloc {
+		storeAlloc()
+	} else {
+		nonRecursiveGenericAllocFunction[OtherOp, CurrentOp](true)
+	}
+}
+
+func TestGenericsInlineLocations(t *testing.T) {
+	if OptimizationOff() {
+		t.Skip("skipping test with optimizations disabled")
+	}
+
+	previousRate := runtime.MemProfileRate
+	runtime.MemProfileRate = 1
+	defer func() {
+		runtime.MemProfileRate = previousRate
+		sink = nil
+	}()
+
+	nonRecursiveGenericAllocFunction[opAlloc, opCall](true)
+	nonRecursiveGenericAllocFunction[opCall, opAlloc](false)
+
+	runtime.GC()
+
+	buf := bytes.NewBuffer(nil)
+	if err := WriteHeapProfile(buf); err != nil {
+		t.Fatalf("writing profile: %v", err)
+	}
+	p, err := profile.Parse(buf)
+	if err != nil {
+		t.Fatalf("profile.Parse: %v", err)
+	}
+
+	const expectedSample = "testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestGenericsInlineLocations;github.com/grafana/pyroscope-go/godeltaprof/compat.nonRecursiveGenericAllocFunction[go.shape.struct {},go.shape.struct { github.com/grafana/pyroscope-go/godeltaprof/compat.buf [128]uint8 }];github.com/grafana/pyroscope-go/godeltaprof/compat.nonRecursiveGenericAllocFunction[go.shape.struct { github.com/grafana/pyroscope-go/godeltaprof/compat.buf [128]uint8 },go.shape.struct {}];github.com/grafana/pyroscope-go/godeltaprof/compat.storeAlloc [1 16 1 16]"
+	const expectedLocation = "github.com/grafana/pyroscope-go/godeltaprof/compat.nonRecursiveGenericAllocFunction[go.shape.struct {},go.shape.struct { github.com/grafana/pyroscope-go/godeltaprof/compat.buf [128]uint8 }];github.com/grafana/pyroscope-go/godeltaprof/compat.nonRecursiveGenericAllocFunction[go.shape.struct { github.com/grafana/pyroscope-go/godeltaprof/compat.buf [128]uint8 },go.shape.struct {}];github.com/grafana/pyroscope-go/godeltaprof/compat.storeAlloc"
+	const expectedLocationNewInliner = "github.com/grafana/pyroscope-go/godeltaprof/compat.TestGenericsInlineLocations;" + expectedLocation
+	var s *profile.Sample
+	for _, sample := range p.Sample {
+		if sampleToString(sample) == expectedSample {
+			s = sample
+			break
+		}
+	}
+	if s == nil {
+		t.Fatalf("expected \n%s\ngot\n%s", expectedSample, strings.Join(profileToStrings(p), "\n"))
+	}
+	loc := s.Location[0]
+	actual := strings.Join(locationToStrings(loc, nil), ";")
+	if expectedLocation != actual && expectedLocationNewInliner != actual {
+		t.Errorf("expected a location with at least 3 functions\n%s\ngot\n%s\n", expectedLocation, actual)
+	}
+}
+
+func OptimizationOff() bool {
+	optimizationMarker := func() uintptr {
+		pc, _, _, _ := runtime.Caller(0)
+		return pc
+	}
+	pc := optimizationMarker()
+	f := runtime.FuncForPC(runtime.FuncForPC(pc).Entry())
+	return f.Name() == "github.com/grafana/pyroscope-go/godeltaprof/compat.OptimizationOff.func1"
+}
+
+func WriteHeapProfile(w io.Writer) error {
 	runtime.GC()
 	dh := godeltaprof.NewHeapProfilerWithOptions(godeltaprof.ProfileOptions{
 		GenericsFrames: true,
