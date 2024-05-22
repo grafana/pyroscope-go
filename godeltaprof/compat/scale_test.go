@@ -32,6 +32,7 @@ func TestScaleMutex(t *testing.T) {
 	const workers = 2
 	const expectedCount = workers * iters
 	const expectedTime = expectedCount * 1000000
+	const e = 0.4
 
 	runtime.SetMutexProfileFraction(fraction)
 
@@ -63,8 +64,8 @@ func TestScaleMutex(t *testing.T) {
 	fmt.Println(my.value[0], my.value[1])
 	fmt.Println(expectedCount, expectedTime)
 
-	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
-	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
+	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), e*float64(expectedCount))
+	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), e*float64(expectedTime))
 }
 
 func TestScaleBlock(t *testing.T) {
