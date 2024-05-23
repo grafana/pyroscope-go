@@ -239,17 +239,6 @@ type locInfo struct {
 	firstPCSymbolizeResult SymbolizeFlag
 }
 
-//type ProfileConfig struct {
-//	PeriodType        ValueType
-//	Period            int64
-//	SampleType        []ValueType
-//	DefaultSampleType string
-//}
-//
-//type ValueType struct {
-//	Typ, Unit string
-//}
-
 // NewProfileBuilder returns a new profileBuilder.
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
