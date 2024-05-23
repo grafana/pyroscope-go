@@ -2,6 +2,7 @@ package compat
 
 import (
 	"bytes"
+	"math/rand"
 	"runtime"
 	"testing"
 
@@ -164,4 +165,70 @@ func TestDeltaBlockProfile(t *testing.T) {
 			expectNoStackFrames(t, p4, stack1Marker)
 		})
 	}
+}
+
+func BenchmarkHeapDelta(b *testing.B) {
+	dh := new(pprof.DeltaHeapProfiler)
+	fs := generateMemProfileRecords(512, 32, 239)
+	rng := rand.NewSource(239)
+	objSize := fs[0].AllocBytes / fs[0].AllocObjects
+	nMutations := int(uint(rng.Int63())) % len(fs)
+	builder := &noopBuilder{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = dh.WriteHeapProto(builder, fs, int64(runtime.MemProfileRate))
+		for j := 0; j < nMutations; j++ {
+			idx := int(uint(rng.Int63())) % len(fs)
+			fs[idx].AllocObjects += 1
+			fs[idx].AllocBytes += objSize
+			fs[idx].FreeObjects += 1
+			fs[idx].FreeBytes += objSize
+		}
+	}
+}
+
+func BenchmarkMutexDelta(b *testing.B) {
+	for i, scaler := range mutexProfileScalers {
+		name := "ScalerMutexProfile"
+		if i == 1 {
+			name = "ScalerBlockProfile"
+		}
+		b.Run(name, func(b *testing.B) {
+			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
+			runtime.SetMutexProfileFraction(5)
+			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
+
+			dh := new(pprof.DeltaMutexProfiler)
+			fs := generateBlockProfileRecords(512, 32, 239)
+			rng := rand.NewSource(239)
+			nMutations := int(uint(rng.Int63())) % len(fs)
+			oneBlockCycles := fs[0].Cycles / fs[0].Count
+			builder := &noopBuilder{}
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				_ = dh.PrintCountCycleProfile(builder, scaler, fs)
+				for j := 0; j < nMutations; j++ {
+					idx := int(uint(rng.Int63())) % len(fs)
+					fs[idx].Count += 1
+					fs[idx].Cycles += oneBlockCycles
+				}
+			}
+		})
+
+	}
+}
+
+type noopBuilder struct {
+}
+
+func (b *noopBuilder) LocsForStack(_ []uintptr) []uint64 {
+	return nil
+}
+func (b *noopBuilder) Sample(_ []int64, _ []uint64, _ int64) {
+
+}
+
+func (b *noopBuilder) Build() {
+
 }

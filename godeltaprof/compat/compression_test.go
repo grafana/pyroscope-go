@@ -45,7 +45,7 @@ func BenchmarkMutexCompression(b *testing.B) {
 
 			opt := &pprof.ProfileBuilderOptions{
 				GenericsFrames: true,
-				LazyMapping:    true, //todo change to true
+				LazyMapping:    true,
 			}
 			dh := new(pprof.DeltaMutexProfiler)
 			fs := generateBlockProfileRecords(512, 32, 239)
