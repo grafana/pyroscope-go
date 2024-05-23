@@ -21,10 +21,10 @@ type ProfileBuilderOptions struct {
 	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
 	GenericsFrames bool
 	LazyMapping    bool
-	mem            []MemMap
+	mem            []memMap
 }
 
-func (d *ProfileBuilderOptions) Mapping() []MemMap {
+func (d *ProfileBuilderOptions) Mapping() []memMap {
 	if d.mem == nil || !d.LazyMapping {
 		d.mem = ReadMapping()
 	}
@@ -47,7 +47,7 @@ type profileBuilder struct {
 	stringMap map[string]int
 	locs      map[uintptr]locInfo // list of locInfo starting with the given PC.
 	funcs     map[string]int      // Package path-qualified function name to Function.ID
-	mem       []MemMap
+	mem       []memMap
 	deck      pcDeck
 	tmplocs   []uint64
 
@@ -193,7 +193,7 @@ func (b *profileBuilder) pbMapping(tag int, id, base, limit, offset uint64, file
 	b.pb.endMessage(tag, start)
 }
 
-func allFrames(addr uintptr) ([]runtime.Frame, SymbolizeFlag) {
+func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
 	// Expand this one address using CallersFrames so we can cache
 	// each expansion. In general, CallersFrames takes a whole
 	// stack, but in this case we know there will be no skips in
@@ -206,9 +206,9 @@ func allFrames(addr uintptr) ([]runtime.Frame, SymbolizeFlag) {
 		return nil, 0
 	}
 
-	symbolizeResult := LookupTried
+	symbolizeResult := lookupTried
 	if frame.PC == 0 || frame.Function == "" || frame.File == "" || frame.Line == 0 {
-		symbolizeResult |= LookupFailed
+		symbolizeResult |= lookupFailed
 	}
 
 	if frame.PC == 0 {
@@ -236,7 +236,7 @@ type locInfo struct {
 	// firstPCFrames and firstPCSymbolizeResult hold the results of the
 	// allFrames call for the first (leaf-most) PC this locInfo represents
 	firstPCFrames          []runtime.Frame
-	firstPCSymbolizeResult SymbolizeFlag
+	firstPCSymbolizeResult symbolizeFlag
 }
 
 // NewProfileBuilder returns a new profileBuilder.
@@ -282,8 +282,8 @@ func (b *profileBuilder) Build() {
 	}
 
 	for i, m := range b.mem {
-		hasFunctions := m.Funcs == LookupTried // LookupTried but not lookupFailed
-		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.Start), uint64(m.End), m.Offset, m.File, m.BuildID, hasFunctions)
+		hasFunctions := m.funcs == lookupTried // lookupTried but not lookupFailed
+		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.start), uint64(m.end), m.offset, m.file, m.buildID, hasFunctions)
 	}
 
 	// TODO: Anything for tagProfile_DropFrames?
@@ -428,14 +428,14 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 type pcDeck struct {
 	pcs             []uintptr
 	frames          []runtime.Frame
-	symbolizeResult SymbolizeFlag
+	symbolizeResult symbolizeFlag
 
 	// firstPCFrames indicates the number of frames associated with the first
 	// (leaf-most) PC in the deck
 	firstPCFrames int
 	// firstPCSymbolizeResult holds the results of the allFrames call for the
 	// first (leaf-most) PC in the deck
-	firstPCSymbolizeResult SymbolizeFlag
+	firstPCSymbolizeResult symbolizeFlag
 }
 
 func (d *pcDeck) reset() {
@@ -449,7 +449,7 @@ func (d *pcDeck) reset() {
 // tryAdd tries to add the pc and Frames expanded from it (most likely one,
 // since the stack trace is already fully expanded) and the symbolizeResult
 // to the deck. If it fails the caller needs to flush the deck and retry.
-func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult SymbolizeFlag) (success bool) {
+func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symbolizeFlag) (success bool) {
 	if existing := len(d.frames); existing > 0 {
 		// 'd.frames' are all expanded from one 'pc' and represent all
 		// inlined functions so we check only the last one.
@@ -536,11 +536,11 @@ func (b *profileBuilder) emitLocation() uint64 {
 		b.pbLine(tagLocation_Line, funcID, int64(frame.Line))
 	}
 	for i := range b.mem {
-		if b.mem[i].Start <= addr && addr < b.mem[i].End || b.mem[i].Fake {
+		if b.mem[i].start <= addr && addr < b.mem[i].end || b.mem[i].fake {
 			b.pb.uint64Opt(tagLocation_MappingID, uint64(i+1))
 
 			m := b.mem[i]
-			m.Funcs |= b.deck.symbolizeResult
+			m.funcs |= b.deck.symbolizeResult
 			b.mem[i] = m
 			break
 		}

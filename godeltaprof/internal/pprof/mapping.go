@@ -7,51 +7,51 @@ import (
 	"strings"
 )
 
-type MemMap struct {
+type memMap struct {
 	// initialized as reading mapping
-	Start   uintptr // Address at which the binary (or DLL) is loaded into memory.
-	End     uintptr // The limit of the address range occupied by this mapping.
-	Offset  uint64  // Offset in the binary that corresponds to the first mapped address.
-	File    string  // The object this entry is loaded from.
-	BuildID string  // A string that uniquely identifies a particular program version with high probability.
+	start   uintptr // Address at which the binary (or DLL) is loaded into memory.
+	end     uintptr // The limit of the address range occupied by this mapping.
+	offset  uint64  // offset in the binary that corresponds to the first mapped address.
+	file    string  // The object this entry is loaded from.
+	buildID string  // A string that uniquely identifies a particular program version with high probability.
 
-	Funcs SymbolizeFlag
-	Fake  bool // map entry was faked; /proc/self/maps wasn't available
+	funcs symbolizeFlag
+	fake  bool // map entry was faked; /proc/self/maps wasn't available
 }
 
-// SymbolizeFlag keeps track of symbolization result.
+// symbolizeFlag keeps track of symbolization result.
 //
 //	0                  : no symbol lookup was performed
-//	1<<0 (LookupTried) : symbol lookup was performed
+//	1<<0 (lookupTried) : symbol lookup was performed
 //	1<<1 (lookupFailed): symbol lookup was performed but failed
-type SymbolizeFlag uint8
+type symbolizeFlag uint8
 
 const (
-	LookupTried  SymbolizeFlag = 1 << iota
-	LookupFailed SymbolizeFlag = 1 << iota
+	lookupTried  symbolizeFlag = 1 << iota
+	lookupFailed symbolizeFlag = 1 << iota
 )
 
-func ReadMapping() []MemMap {
+func ReadMapping() []memMap {
 	data, _ := os.ReadFile("/proc/self/maps")
-	var mem []MemMap
+	var mem []memMap
 	parseProcSelfMaps(data, func(lo, hi, offset uint64, file, buildID string) {
-		mem = append(mem, MemMap{
-			Start:   uintptr(lo),
-			End:     uintptr(hi),
-			Offset:  offset,
-			File:    file,
-			BuildID: buildID,
-			Fake:    false,
+		mem = append(mem, memMap{
+			start:   uintptr(lo),
+			end:     uintptr(hi),
+			offset:  offset,
+			file:    file,
+			buildID: buildID,
+			fake:    false,
 		})
 	})
 	if len(mem) == 0 { // pprof expects a map entry, so fake one.
-		mem = []MemMap{{
-			Start:   uintptr(0),
-			End:     uintptr(0),
-			Offset:  0,
-			File:    "",
-			BuildID: "",
-			Fake:    true,
+		mem = []memMap{{
+			start:   uintptr(0),
+			end:     uintptr(0),
+			offset:  0,
+			file:    "",
+			buildID: "",
+			fake:    true,
 		}}
 	}
 	return mem
