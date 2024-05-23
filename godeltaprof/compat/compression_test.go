@@ -10,7 +10,12 @@ import (
 )
 
 func BenchmarkHeapCompression(b *testing.B) {
-	dh := pprof.DeltaHeapProfiler{}
+	dh := &pprof.DeltaHeapProfiler{
+		Options: pprof.ProfileBuilderOptions{
+			GenericsFrames: true,
+			LazyMapping:    true,
+		},
+	}
 	fs := generateMemProfileRecords(512, 32, 239)
 	rng := rand.NewSource(239)
 	objSize := fs[0].AllocBytes / fs[0].AllocObjects
@@ -39,7 +44,12 @@ func BenchmarkMutexCompression(b *testing.B) {
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			dh := pprof.DeltaMutexProfiler{}
+			dh := &pprof.DeltaMutexProfiler{
+				Options: pprof.ProfileBuilderOptions{
+					GenericsFrames: true,
+					LazyMapping:    true,
+				},
+			}
 			fs := generateBlockProfileRecords(512, 32, 239)
 			rng := rand.NewSource(239)
 			nMutations := int(uint(rng.Int63())) % len(fs)
