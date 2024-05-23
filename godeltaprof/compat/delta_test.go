@@ -39,10 +39,11 @@ func TestDeltaHeap(t *testing.T) {
 	const testMemProfileRate = 524288
 	const testObjectSize = 327680
 
-	dh := pprof.DeltaHeapProfiler{}
+	dh := new(pprof.DeltaHeapProfiler)
+	opt := new(pprof.ProfileBuilderOptions)
 	dump := func(r ...runtime.MemProfileRecord) *bytes.Buffer {
 		buf := bytes.NewBuffer(nil)
-		err := dh.WriteHeapProto(buf, r, testMemProfileRate, "")
+		err := WriteHeapProto(dh, opt, buf, r, testMemProfileRate)
 		assert.NoError(t, err)
 		return buf
 	}
@@ -108,7 +109,8 @@ func TestDeltaBlockProfile(t *testing.T) {
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			dh := pprof.DeltaMutexProfiler{}
+			dh := new(pprof.DeltaMutexProfiler)
+			opt := new(pprof.ProfileBuilderOptions)
 
 			scale := func(rcount, rcycles int64) (int64, int64) {
 				count, nanosec := pprof.ScaleMutexProfile(scaler, rcount, float64(rcycles)/cpuGHz)
@@ -117,7 +119,7 @@ func TestDeltaBlockProfile(t *testing.T) {
 			}
 			dump := func(r ...runtime.BlockProfileRecord) *bytes.Buffer {
 				buf := bytes.NewBuffer(nil)
-				err := dh.PrintCountCycleProfile(buf, "contentions", "delay", scaler, r)
+				err := PrintCountCycleProfile(dh, opt, buf, scaler, r)
 				assert.NoError(t, err)
 				return buf
 			}

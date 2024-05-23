@@ -10,19 +10,18 @@ import (
 )
 
 func BenchmarkHeapCompression(b *testing.B) {
-	dh := &pprof.DeltaHeapProfiler{
-		Options: pprof.ProfileBuilderOptions{
-			GenericsFrames: true,
-			LazyMapping:    true,
-		},
+	opt := &pprof.ProfileBuilderOptions{
+		GenericsFrames: true,
+		LazyMapping:    true,
 	}
+	dh := new(pprof.DeltaHeapProfiler)
 	fs := generateMemProfileRecords(512, 32, 239)
 	rng := rand.NewSource(239)
 	objSize := fs[0].AllocBytes / fs[0].AllocObjects
 	nMutations := int(uint(rng.Int63())) % len(fs)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = dh.WriteHeapProto(io.Discard, fs, int64(runtime.MemProfileRate), "")
+		_ = WriteHeapProto(dh, opt, io.Discard, fs, int64(runtime.MemProfileRate))
 		for j := 0; j < nMutations; j++ {
 			idx := int(uint(rng.Int63())) % len(fs)
 			fs[idx].AllocObjects += 1
@@ -44,12 +43,11 @@ func BenchmarkMutexCompression(b *testing.B) {
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			dh := &pprof.DeltaMutexProfiler{
-				Options: pprof.ProfileBuilderOptions{
-					GenericsFrames: true,
-					LazyMapping:    true,
-				},
+			opt := &pprof.ProfileBuilderOptions{
+				GenericsFrames: true,
+				LazyMapping:    true, //todo change to true
 			}
+			dh := new(pprof.DeltaMutexProfiler)
 			fs := generateBlockProfileRecords(512, 32, 239)
 			rng := rand.NewSource(239)
 			nMutations := int(uint(rng.Int63())) % len(fs)
@@ -57,7 +55,7 @@ func BenchmarkMutexCompression(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				_ = dh.PrintCountCycleProfile(io.Discard, "contentions", "delay", scaler, fs)
+				_ = PrintCountCycleProfile(dh, opt, io.Discard, scaler, fs)
 				for j := 0; j < nMutations; j++ {
 					idx := int(uint(rng.Int63())) % len(fs)
 					fs[idx].Count += 1
@@ -67,4 +65,16 @@ func BenchmarkMutexCompression(b *testing.B) {
 		})
 
 	}
+}
+
+func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, p []runtime.MemProfileRecord, rate int64) error {
+	stc := pprof.HeapProfileConfig(rate)
+	b := pprof.NewProfileBuilder(w, opt, stc)
+	return dp.WriteHeapProto(b, p, rate)
+}
+
+func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
+	stc := pprof.MutexProfileConfig()
+	b := pprof.NewProfileBuilder(w, opt, stc)
+	return d.PrintCountCycleProfile(b, scaler, records)
 }

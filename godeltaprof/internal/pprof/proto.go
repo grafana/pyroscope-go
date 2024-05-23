@@ -5,12 +5,8 @@
 package pprof
 
 import (
-	"bytes"
 	"io"
-	"os"
 	"runtime"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -25,6 +21,14 @@ type ProfileBuilderOptions struct {
 	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
 	GenericsFrames bool
 	LazyMapping    bool
+	mem            []MemMap
+}
+
+func (d *ProfileBuilderOptions) Mapping() []MemMap {
+	if d.mem == nil || !d.LazyMapping {
+		d.mem = ReadMapping()
+	}
+	return d.mem
 }
 
 // A profileBuilder writes a profile incrementally from a
@@ -43,35 +47,12 @@ type profileBuilder struct {
 	stringMap map[string]int
 	locs      map[uintptr]locInfo // list of locInfo starting with the given PC.
 	funcs     map[string]int      // Package path-qualified function name to Function.ID
-	mem       []memMap
+	mem       []MemMap
 	deck      pcDeck
+	tmplocs   []uint64
 
-	opt ProfileBuilderOptions
+	opt *ProfileBuilderOptions
 }
-
-type memMap struct {
-	// initialized as reading mapping
-	start   uintptr // Address at which the binary (or DLL) is loaded into memory.
-	end     uintptr // The limit of the address range occupied by this mapping.
-	offset  uint64  // Offset in the binary that corresponds to the first mapped address.
-	file    string  // The object this entry is loaded from.
-	buildID string  // A string that uniquely identifies a particular program version with high probability.
-
-	funcs symbolizeFlag
-	fake  bool // map entry was faked; /proc/self/maps wasn't available
-}
-
-// symbolizeFlag keeps track of symbolization result.
-//
-//	0                  : no symbol lookup was performed
-//	1<<0 (lookupTried) : symbol lookup was performed
-//	1<<1 (lookupFailed): symbol lookup was performed but failed
-type symbolizeFlag uint8
-
-const (
-	lookupTried  symbolizeFlag = 1 << iota
-	lookupFailed symbolizeFlag = 1 << iota
-)
 
 const (
 	// message Profile
@@ -162,13 +143,13 @@ func (b *profileBuilder) pbValueType(tag int, typ, unit string) {
 	b.pb.endMessage(tag, start)
 }
 
-// pbSample encodes a Sample message to b.pb.
-func (b *profileBuilder) pbSample(values []int64, locs []uint64, labels func()) {
+// Sample encodes a Sample message to b.pb.
+func (b *profileBuilder) Sample(values []int64, locs []uint64, blockSize int64) {
 	start := b.pb.startMessage()
 	b.pb.int64s(tagSample_Value, values)
 	b.pb.uint64s(tagSample_Location, locs)
-	if labels != nil {
-		labels()
+	if blockSize != 0 {
+		b.pbLabel(tagSample_Label, "bytes", "", blockSize)
 	}
 	b.pb.endMessage(tagProfile_Sample, start)
 	b.flush()
@@ -212,7 +193,7 @@ func (b *profileBuilder) pbMapping(tag int, id, base, limit, offset uint64, file
 	b.pb.endMessage(tag, start)
 }
 
-func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
+func allFrames(addr uintptr) ([]runtime.Frame, SymbolizeFlag) {
 	// Expand this one address using CallersFrames so we can cache
 	// each expansion. In general, CallersFrames takes a whole
 	// stack, but in this case we know there will be no skips in
@@ -225,9 +206,9 @@ func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
 		return nil, 0
 	}
 
-	symbolizeResult := lookupTried
+	symbolizeResult := LookupTried
 	if frame.PC == 0 || frame.Function == "" || frame.File == "" || frame.Line == 0 {
-		symbolizeResult |= lookupFailed
+		symbolizeResult |= LookupFailed
 	}
 
 	if frame.PC == 0 {
@@ -255,14 +236,25 @@ type locInfo struct {
 	// firstPCFrames and firstPCSymbolizeResult hold the results of the
 	// allFrames call for the first (leaf-most) PC this locInfo represents
 	firstPCFrames          []runtime.Frame
-	firstPCSymbolizeResult symbolizeFlag
+	firstPCSymbolizeResult SymbolizeFlag
 }
 
-// newProfileBuilder returns a new profileBuilder.
+//type ProfileConfig struct {
+//	PeriodType        ValueType
+//	Period            int64
+//	SampleType        []ValueType
+//	DefaultSampleType string
+//}
+//
+//type ValueType struct {
+//	Typ, Unit string
+//}
+
+// NewProfileBuilder returns a new profileBuilder.
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
-func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions, mapping []memMap) *profileBuilder {
+func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfig) ProfileBuilder {
 	zw := newGzipWriter(w)
 	b := &profileBuilder{
 		w:         w,
@@ -273,13 +265,22 @@ func newProfileBuilder(w io.Writer, opt ProfileBuilderOptions, mapping []memMap)
 		locs:      map[uintptr]locInfo{},
 		funcs:     map[string]int{},
 		opt:       opt,
+		tmplocs:   make([]uint64, 0, 128),
 	}
-	b.mem = mapping
+	b.mem = opt.Mapping()
+	b.pbValueType(tagProfile_PeriodType, stc.PeriodType.Typ, stc.PeriodType.Unit)
+	b.pb.int64Opt(tagProfile_Period, stc.Period)
+	for _, st := range stc.SampleType {
+		b.pbValueType(tagProfile_SampleType, st.Typ, st.Unit)
+	}
+	if stc.DefaultSampleType != "" {
+		b.pb.int64Opt(tagProfile_DefaultSampleType, b.stringIndex(stc.DefaultSampleType))
+	}
 	return b
 }
 
-// build completes and returns the constructed profile.
-func (b *profileBuilder) build() {
+// Build completes and returns the constructed profile.
+func (b *profileBuilder) Build() {
 	b.end = time.Now()
 
 	b.pb.int64Opt(tagProfile_TimeNanos, b.start.UnixNano())
@@ -292,8 +293,8 @@ func (b *profileBuilder) build() {
 	}
 
 	for i, m := range b.mem {
-		hasFunctions := m.funcs == lookupTried // lookupTried but not lookupFailed
-		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.start), uint64(m.end), m.offset, m.file, m.buildID, hasFunctions)
+		hasFunctions := m.Funcs == LookupTried // LookupTried but not lookupFailed
+		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.Start), uint64(m.End), m.Offset, m.File, m.BuildID, hasFunctions)
 	}
 
 	// TODO: Anything for tagProfile_DropFrames?
@@ -304,7 +305,7 @@ func (b *profileBuilder) build() {
 	b.zw.Close()
 }
 
-// appendLocsForStack appends the location IDs for the given stack trace to the given
+// LocsForStack appends the location IDs for the given stack trace to the given
 // location ID slice, locs. The addresses in the stack are return PCs or 1 + the PC of
 // an inline marker as the runtime traceback function returns.
 //
@@ -313,7 +314,8 @@ func (b *profileBuilder) build() {
 // get the right cumulative sample count.
 //
 // It may emit to b.pb, so there must be no message encoding in progress.
-func (b *profileBuilder) appendLocsForStack(locs []uint64, stk []uintptr) (newLocs []uint64) {
+func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
+	locs := b.tmplocs[:0]
 	b.deck.reset()
 
 	// The last frame might be truncated. Recover lost inline frames.
@@ -437,14 +439,14 @@ func (b *profileBuilder) appendLocsForStack(locs []uint64, stk []uintptr) (newLo
 type pcDeck struct {
 	pcs             []uintptr
 	frames          []runtime.Frame
-	symbolizeResult symbolizeFlag
+	symbolizeResult SymbolizeFlag
 
 	// firstPCFrames indicates the number of frames associated with the first
 	// (leaf-most) PC in the deck
 	firstPCFrames int
 	// firstPCSymbolizeResult holds the results of the allFrames call for the
 	// first (leaf-most) PC in the deck
-	firstPCSymbolizeResult symbolizeFlag
+	firstPCSymbolizeResult SymbolizeFlag
 }
 
 func (d *pcDeck) reset() {
@@ -458,7 +460,7 @@ func (d *pcDeck) reset() {
 // tryAdd tries to add the pc and Frames expanded from it (most likely one,
 // since the stack trace is already fully expanded) and the symbolizeResult
 // to the deck. If it fails the caller needs to flush the deck and retry.
-func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symbolizeFlag) (success bool) {
+func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult SymbolizeFlag) (success bool) {
 	if existing := len(d.frames); existing > 0 {
 		// 'd.frames' are all expanded from one 'pc' and represent all
 		// inlined functions so we check only the last one.
@@ -545,11 +547,11 @@ func (b *profileBuilder) emitLocation() uint64 {
 		b.pbLine(tagLocation_Line, funcID, int64(frame.Line))
 	}
 	for i := range b.mem {
-		if b.mem[i].start <= addr && addr < b.mem[i].end || b.mem[i].fake {
+		if b.mem[i].Start <= addr && addr < b.mem[i].End || b.mem[i].Fake {
 			b.pb.uint64Opt(tagLocation_MappingID, uint64(i+1))
 
 			m := b.mem[i]
-			m.funcs |= b.deck.symbolizeResult
+			m.Funcs |= b.deck.symbolizeResult
 			b.mem[i] = m
 			break
 		}
@@ -569,148 +571,4 @@ func (b *profileBuilder) emitLocation() uint64 {
 
 	b.flush()
 	return id
-}
-
-func readMapping() []memMap {
-	data, _ := os.ReadFile("/proc/self/maps")
-	var mem []memMap
-	parseProcSelfMaps(data, func(lo, hi, offset uint64, file, buildID string) {
-		mem = append(mem, memMap{
-			start:   uintptr(lo),
-			end:     uintptr(hi),
-			offset:  offset,
-			file:    file,
-			buildID: buildID,
-			fake:    false,
-		})
-	})
-	if len(mem) == 0 { // pprof expects a map entry, so fake one.
-		mem = []memMap{{
-			start:   uintptr(0),
-			end:     uintptr(0),
-			offset:  0,
-			file:    "",
-			buildID: "",
-			fake:    true,
-		}}
-	}
-	return mem
-}
-
-var space = []byte(" ")
-var newline = []byte("\n")
-
-func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file, buildID string)) {
-	// $ cat /proc/self/maps
-	// 00400000-0040b000 r-xp 00000000 fc:01 787766                             /bin/cat
-	// 0060a000-0060b000 r--p 0000a000 fc:01 787766                             /bin/cat
-	// 0060b000-0060c000 rw-p 0000b000 fc:01 787766                             /bin/cat
-	// 014ab000-014cc000 rw-p 00000000 00:00 0                                  [heap]
-	// 7f7d76af8000-7f7d7797c000 r--p 00000000 fc:01 1318064                    /usr/lib/locale/locale-archive
-	// 7f7d7797c000-7f7d77b36000 r-xp 00000000 fc:01 1180226                    /lib/x86_64-linux-gnu/libc-2.19.so
-	// 7f7d77b36000-7f7d77d36000 ---p 001ba000 fc:01 1180226                    /lib/x86_64-linux-gnu/libc-2.19.so
-	// 7f7d77d36000-7f7d77d3a000 r--p 001ba000 fc:01 1180226                    /lib/x86_64-linux-gnu/libc-2.19.so
-	// 7f7d77d3a000-7f7d77d3c000 rw-p 001be000 fc:01 1180226                    /lib/x86_64-linux-gnu/libc-2.19.so
-	// 7f7d77d3c000-7f7d77d41000 rw-p 00000000 00:00 0
-	// 7f7d77d41000-7f7d77d64000 r-xp 00000000 fc:01 1180217                    /lib/x86_64-linux-gnu/ld-2.19.so
-	// 7f7d77f3f000-7f7d77f42000 rw-p 00000000 00:00 0
-	// 7f7d77f61000-7f7d77f63000 rw-p 00000000 00:00 0
-	// 7f7d77f63000-7f7d77f64000 r--p 00022000 fc:01 1180217                    /lib/x86_64-linux-gnu/ld-2.19.so
-	// 7f7d77f64000-7f7d77f65000 rw-p 00023000 fc:01 1180217                    /lib/x86_64-linux-gnu/ld-2.19.so
-	// 7f7d77f65000-7f7d77f66000 rw-p 00000000 00:00 0
-	// 7ffc342a2000-7ffc342c3000 rw-p 00000000 00:00 0                          [stack]
-	// 7ffc34343000-7ffc34345000 r-xp 00000000 00:00 0                          [vdso]
-	// ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
-
-	var line []byte
-	// next removes and returns the next field in the line.
-	// It also removes from line any spaces following the field.
-	next := func() []byte {
-		var f []byte
-		f, line, _ = bytesCut(line, space)
-		line = bytes.TrimLeft(line, " ")
-		return f
-	}
-
-	for len(data) > 0 {
-		line, data, _ = bytesCut(data, newline)
-		addr := next()
-		loStr, hiStr, ok := stringsCut(string(addr), "-")
-		if !ok {
-			continue
-		}
-		lo, err := strconv.ParseUint(loStr, 16, 64)
-		if err != nil {
-			continue
-		}
-		hi, err := strconv.ParseUint(hiStr, 16, 64)
-		if err != nil {
-			continue
-		}
-		perm := next()
-		if len(perm) < 4 || perm[2] != 'x' {
-			// Only interested in executable mappings.
-			continue
-		}
-		offset, err := strconv.ParseUint(string(next()), 16, 64)
-		if err != nil {
-			continue
-		}
-		next()          // dev
-		inode := next() // inode
-		if line == nil {
-			continue
-		}
-		file := string(line)
-
-		// Trim deleted file marker.
-		deletedStr := " (deleted)"
-		deletedLen := len(deletedStr)
-		if len(file) >= deletedLen && file[len(file)-deletedLen:] == deletedStr {
-			file = file[:len(file)-deletedLen]
-		}
-
-		if len(inode) == 1 && inode[0] == '0' && file == "" {
-			// Huge-page text mappings list the initial fragment of
-			// mapped but unpopulated memory as being inode 0.
-			// Don't report that part.
-			// But [vdso] and [vsyscall] are inode 0, so let non-empty file names through.
-			continue
-		}
-
-		// TODO: pprof's remapMappingIDs makes one adjustment:
-		// 1. If there is an /anon_hugepage mapping first and it is
-		// consecutive to a next mapping, drop the /anon_hugepage.
-		// There's no indication why this is needed.
-		// Let's try not doing this and see what breaks.
-		// If we do need it, it would go here, before we
-		// enter the mappings into b.mem in the first place.
-
-		buildID, _ := elfBuildID(file)
-		addMapping(lo, hi, offset, file, buildID)
-	}
-}
-
-// Cut slices s around the first instance of sep,
-// returning the text before and after sep.
-// The found result reports whether sep appears in s.
-// If sep does not appear in s, cut returns s, nil, false.
-//
-// Cut returns slices of the original slice s, not copies.
-func bytesCut(s, sep []byte) (before, after []byte, found bool) {
-	if i := bytes.Index(s, sep); i >= 0 {
-		return s[:i], s[i+len(sep):], true
-	}
-	return s, nil, false
-}
-
-// Cut slices s around the first instance of sep,
-// returning the text before and after sep.
-// The found result reports whether sep appears in s.
-// If sep does not appear in s, cut returns s, "", false.
-func stringsCut(s, sep string) (before, after string, found bool) {
-	if i := strings.Index(s, sep); i >= 0 {
-		return s[:i], s[i+len(sep):], true
-	}
-	return s, "", false
 }
