@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"runtime"
-	"slices"
+	"sort"
 	"testing"
 )
 
@@ -210,7 +210,7 @@ func BenchmarkMutexDelta(b *testing.B) {
 //}
 
 type allocEntry struct {
-	pc     []uintptr
+	pc     []int64
 	values []int64
 	sample *gprofile.Sample
 }
@@ -274,7 +274,7 @@ func compareSamplesWithPattern(t *testing.T, p0, p1 *bytes.Buffer, gtn int, patt
 			}
 			e := allocEntry{}
 			for _, location := range sample.Location {
-				e.pc = append(e.pc, uintptr(location.Address))
+				e.pc = append(e.pc, int64(location.Address))
 			}
 			e.values = sample.Value
 			e.sample = sample
@@ -282,26 +282,67 @@ func compareSamplesWithPattern(t *testing.T, p0, p1 *bytes.Buffer, gtn int, patt
 		}
 		entries = append(entries, es)
 	}
-	for i, es := range entries {
-		slices.SortFunc(es, func(i, j allocEntry) int {
-			pc := slices.Compare(i.pc, j.pc)
-			if pc != 0 {
-				return pc
+	cmpi := func(x, y int64) int {
+		if x < y {
+			return -1
+		}
+		if x > y {
+			return +1
+		}
+		return 0
+	}
+	cmp := func(s1, s2 []int64) int {
+		for i, v1 := range s1 {
+			if i >= len(s2) {
+				return +1
 			}
-			return slices.Compare(i.values, j.values)
+			v2 := s2[i]
+			if c := cmpi(v1, v2); c != 0 {
+				return c
+			}
+		}
+		if len(s1) < len(s2) {
+			return -1
+		}
+		return 0
+	}
+
+	pcmaps := []map[string]int{}
+
+	for i, es := range entries {
+		sort.Slice(es, func(i, j int) bool {
+			if c := cmp(es[i].pc, es[j].pc); c != 0 {
+				return c < 0
+			}
+			if c := cmp(es[i].values, es[j].values); c != 0 {
+				return c < 0
+			}
+			return false
 		})
 		ss := []string{}
 		fmt.Printf("========================== %d\n", i)
+		pcmap := map[string]int{}
 		for _, e := range es {
 			ss = append(ss, e.String())
 			fmt.Printf("%s\n", e.String())
 			fmt.Printf("%s\n", e.String2())
+			pcmap[fmt.Sprintf("%+v", e.pc)]++
 		}
 		strEntries = append(strEntries, ss)
+		pcmaps = append(pcmaps, pcmap)
 	}
 
 	assert.Equal(t, strEntries[0], strEntries[1])
 	assert.GreaterOrEqual(t, len(strEntries[0]), gtn)
+
+	cnt := 0
+	pcmap := pcmaps[0]
+	for _, v := range pcmap {
+		if v > 1 {
+			cnt++
+		}
+	}
+	assert.Greater(t, cnt, 0)
 }
 
 type structWithPointers struct {
