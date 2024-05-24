@@ -242,6 +242,7 @@ func TestChanAllocDup(t *testing.T) {
 	for _, p := range profiles {
 		printProfile(t, p)
 		// different types of allocations depending on the capacity of the channel and whether the channel type has pointers
+		// this is fragile and relies on runtime internals
 		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
 			1,
 			1, 18432, 0, 0)
