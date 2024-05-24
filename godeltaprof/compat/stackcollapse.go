@@ -66,7 +66,7 @@ func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern stri
 			cnt++
 		}
 	}
-	assert.Equalf(t, expectedCount, cnt, "expected samples re: %s\n   values: %v\n    count:%d\n    all samples:%v\n", samplePattern, expectedValues, expectedCount, samples)
+	assert.Equalf(t, expectedCount, cnt, "expected samples re: %s\n   values: %v\n    count:%d\n    all samples:%+v\n", samplePattern, expectedValues, expectedCount, samples)
 }
 
 func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sample {
