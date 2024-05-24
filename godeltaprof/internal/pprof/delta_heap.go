@@ -8,6 +8,7 @@ import (
 
 type DeltaHeapProfiler struct {
 	m profMap
+	//todo consider adding an option to remove block size label and merge allocations of different size
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
@@ -34,8 +35,8 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		entry.count.v1 = r.AllocObjects
 		entry.count.v2 = r.AllocBytes
 
-		values[0], values[1] = scaleHeapSample(AllocObjects, AllocBytes, rate)
-		values[2], values[3] = scaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
+		values[0], values[1] = ScaleHeapSample(AllocObjects, AllocBytes, rate)
+		values[2], values[3] = ScaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
 
 		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
 			continue
@@ -70,7 +71,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 	return nil
 }
 
-// scaleHeapSample adjusts the data from a heap Sample to
+// ScaleHeapSample adjusts the data from a heap Sample to
 // account for its probability of appearing in the collected
 // data. heap profiles are a sampling of the memory allocations
 // requests in a program. We estimate the unsampled value by dividing
@@ -79,7 +80,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 // which samples to collect, based on the desired average collection
 // rate R. The probability of a sample of size S to appear in that
 // profile is 1-exp(-S/R).
-func scaleHeapSample(count, size, rate int64) (int64, int64) {
+func ScaleHeapSample(count, size, rate int64) (int64, int64) {
 	if count == 0 || size == 0 {
 		return 0, 0
 	}

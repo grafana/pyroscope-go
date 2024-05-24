@@ -3,6 +3,7 @@ package compat
 import (
 	"bytes"
 	"io"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -26,6 +27,16 @@ func expectEmptyProfile(t *testing.T, buffer io.Reader) {
 	assert.Empty(t, ls)
 }
 
+func printProfile(t *testing.T, p *bytes.Buffer) {
+	profile, err := gprofile.Parse(bytes.NewBuffer(p.Bytes()))
+	require.NoError(t, err)
+	t.Log("==================")
+	for _, sample := range profile.Sample {
+		s := pprofSampleToString(sample)
+		t.Logf("%v %v %v\n", s, sample.Value, sample.NumLabel)
+	}
+}
+
 func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
@@ -45,6 +56,32 @@ func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, val
 	}
 }
 
+func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern string, expectedCount int, expectedValues ...int64) {
+	profile, err := gprofile.ParseData(buffer.Bytes())
+	require.NoError(t, err)
+	cnt := 0
+	samples := grepSamples(profile, samplePattern)
+	for i := range samples {
+		if reflect.DeepEqual(profile.Sample[i].Value, expectedValues) {
+			cnt++
+		}
+	}
+	assert.Equal(t, expectedCount, cnt)
+}
+
+func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sample {
+	rr := regexp.MustCompile(samplePattern)
+	var samples []*gprofile.Sample
+	for i := range profile.Sample {
+		ss := pprofSampleToString(profile.Sample[i])
+		if !rr.MatchString(ss) {
+			continue
+		}
+		samples = append(samples, profile.Sample[i])
+	}
+	return samples
+}
+
 func findStack(t *testing.T, res []stack, re string) *stack {
 	rr := regexp.MustCompile(re)
 	for i, re := range res {
@@ -58,23 +95,9 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	var ret []stack
 	for _, s := range p.Sample {
-		var funcs []string
-		for i := range s.Location {
-
-			loc := s.Location[i]
-			for _, line := range loc.Line {
-				f := line.Function
-				//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
-				funcs = append(funcs, f.Name)
-			}
-		}
-		for i := 0; i < len(funcs)/2; i++ {
-			j := len(funcs) - i - 1
-			funcs[i], funcs[j] = funcs[j], funcs[i]
-		}
-
+		funcs, strSample := pprofSampleToStrings(s)
 		ret = append(ret, stack{
-			line:  strings.Join(funcs, ";"),
+			line:  strSample,
 			funcs: funcs,
 			value: s.Value,
 		})
@@ -104,4 +127,29 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	t.Log("===================================================")
 
 	return unique
+}
+
+func pprofSampleToString(s *gprofile.Sample) string {
+	_, v := pprofSampleToStrings(s)
+	return v
+}
+
+func pprofSampleToStrings(s *gprofile.Sample) ([]string, string) {
+	var funcs []string
+	for i := range s.Location {
+
+		loc := s.Location[i]
+		for _, line := range loc.Line {
+			f := line.Function
+			//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
+			funcs = append(funcs, f.Name)
+		}
+	}
+	for i := 0; i < len(funcs)/2; i++ {
+		j := len(funcs) - i - 1
+		funcs[i], funcs[j] = funcs[j], funcs[i]
+	}
+
+	strSample := strings.Join(funcs, ";")
+	return funcs, strSample
 }

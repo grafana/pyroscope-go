@@ -313,12 +313,31 @@ func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuild
 	return d.PrintCountCycleProfile(b, scaler, records)
 }
 
+func dumpMemProfileRecords() []runtime.MemProfileRecord {
+	var p []runtime.MemProfileRecord
+	n, ok := runtime.MemProfile(nil, true)
+	for {
+		// Allocate room for a slightly bigger profile,
+		// in case a few more entries have been added
+		// since the call to MemProfile.
+		p = make([]runtime.MemProfileRecord, n+50)
+		n, ok = runtime.MemProfile(p, true)
+		if ok {
+			p = p[0:n]
+			break
+		}
+		// Profile grew; try again.
+	}
+	return p
+}
+
 type noopBuilder struct {
 }
 
 func (b *noopBuilder) LocsForStack(_ []uintptr) []uint64 {
 	return nil
 }
+
 func (b *noopBuilder) Sample(_ []int64, _ []uint64, _ int64) {
 
 }

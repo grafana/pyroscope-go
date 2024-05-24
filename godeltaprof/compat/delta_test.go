@@ -1,6 +1,13 @@
 package compat
 
 import (
+	"bytes"
+	"fmt"
+	gprofile "github.com/google/pprof/profile"
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"reflect"
 	"runtime"
 	"testing"
 )
@@ -36,6 +43,7 @@ func TestDeltaHeap(t *testing.T) {
 	const testObjectSize = 327680
 
 	h := newHeapTestHelper()
+	h.rate = testMemProfileRate
 
 	p1 := h.dump(
 		h.r(0, 0, 0, 0, stack0),
@@ -158,4 +166,152 @@ func BenchmarkMutexDelta(b *testing.B) {
 		})
 
 	}
+}
+
+func TestMutexDuplicates(t *testing.T) {
+	h := newMutexTestHelper()
+	const cycles = 42
+	p := h.dump(
+		h.r(239, 239*cycles, stack0),
+		h.r(42, 42*cycles, stack1),
+		h.r(7, 7*cycles, stack0),
+	)
+	expectStackFrames(t, p, stack0Marker, 239+7, (239+7)*cycles)
+	expectStackFrames(t, p, stack1Marker, 239+7, (239+7)*cycles)
+
+	p = h.dump(
+		h.r(239, 239*cycles, stack0),
+		h.r(42, 42*cycles, stack1),
+		h.r(7, 7*cycles, stack0),
+	)
+	expectEmptyProfile(t, p)
+}
+
+func TestHeapDuplicates(t *testing.T) {
+	const testMemProfileRate = 524288
+	h := newHeapTestHelper()
+	h.rate = testMemProfileRate
+	const blockSize = 1024
+	p := h.dump(
+		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),
+		h.r(42, 42*blockSize, 42, 42*blockSize, stack1),
+		h.r(7, 7*blockSize, 7, 7*blockSize, stack0),
+	)
+	c1, b1 := pprof.ScaleHeapSample(239+7, (239+7)*blockSize, testMemProfileRate)
+	expectStackFrames(t, p, stack0Marker, c1, b1, 0, 0)
+	c2, b2 := pprof.ScaleHeapSample(42, 42*blockSize, testMemProfileRate)
+	expectStackFrames(t, p, stack1Marker, c2, b2, 0, 0)
+
+	p = h.dump(
+		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),
+		h.r(42, 42*blockSize, 42, 42*blockSize, stack1),
+		h.r(7, 7*blockSize, 7, 7*blockSize, stack0),
+	)
+	expectEmptyProfile(t, p)
+}
+
+func TestChanAllocDup(t *testing.T) {
+	prevRate := runtime.MemProfileRate
+	runtime.MemProfileRate = 1
+	defer func() {
+		runtime.MemProfileRate = prevRate
+	}()
+	h := newHeapTestHelper()
+	h.rate = int64(runtime.MemProfileRate)
+
+	tests := []int{0, 1024}
+	profiles := []*bytes.Buffer{
+		bytes.NewBuffer(nil),
+		bytes.NewBuffer(nil),
+	}
+	f := func(i int) {
+		for _, test := range tests {
+			_ = make(chan int, test)
+			_ = make(chan structWithPointers, test) // with pointers
+		}
+		runtime.GC()
+		runtime.GC()
+		p := profiles[i]
+		_ = WriteHeapProto(h.dp, h.opt, p, dumpMemProfileRecords(), h.rate)
+	}
+	for i := 0; i < 2; i++ {
+		f(i)
+	}
+	runtime.MemProfileRate = prevRate
+
+	for _, p := range profiles {
+		printProfile(t, p)
+		// different types of allocations depending on the capacity of the channel and whether the channel type has pointers
+		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
+			1,
+			1, 18432, 0, 0)
+		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
+			3,
+			1, 96, 0, 0)
+		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
+			1,
+			1, 9472, 0, 0)
+	}
+}
+
+type structWithPointers struct {
+	t1 *testing.T
+	t2 *testing.T
+}
+
+// todo we should merge these allocations with an option
+func TestMapAlloc(t *testing.T) {
+	prevRate := runtime.MemProfileRate
+	runtime.MemProfileRate = 1
+	defer func() {
+		runtime.MemProfileRate = prevRate
+	}()
+	h := newHeapTestHelper()
+	h.rate = int64(runtime.MemProfileRate)
+
+	profiles := []*bytes.Buffer{
+		bytes.NewBuffer(nil),
+		bytes.NewBuffer(nil),
+	}
+	f := func(i int) {
+		mm := make(map[string]structWithPointers)
+		for i := 0; i < 1024; i++ {
+			k := fmt.Sprintf("k_____%d", i)
+			mm[k] = structWithPointers{t, t}
+		}
+		runtime.GC()
+		runtime.GC()
+		p := profiles[i]
+		_ = WriteHeapProto(h.dp, h.opt, p, dumpMemProfileRecords(), h.rate)
+	}
+	for i := 0; i < 2; i++ {
+		f(i)
+	}
+
+	runtime.MemProfileRate = prevRate
+
+	p0, err := gprofile.ParseData(profiles[0].Bytes())
+	require.NoError(t, err)
+	p1, err := gprofile.ParseData(profiles[0].Bytes())
+	require.NoError(t, err)
+
+	p0samples := grepSamples(p0, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$")
+	printProfile(t, profiles[0])
+	for _, sample := range p0samples {
+		p0Count := 0
+		for _, p0sample := range p0samples {
+			if reflect.DeepEqual(sample.Value, p0sample.Value) {
+				p0Count++
+			}
+		}
+		p1Count := 0
+		for _, p1sample := range p1.Sample {
+			if reflect.DeepEqual(sample.Value, p1sample.Value) {
+				p1Count++
+			}
+		}
+		assert.Greater(t, p0Count, 0)
+		assert.Equal(t, p0Count, p1Count)
+	}
+	assert.Greater(t, len(p0samples), 10)
 }
