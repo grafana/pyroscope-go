@@ -298,6 +298,7 @@ func TestMapAlloc(t *testing.T) {
 
 	p0samples := grepSamples(p0, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$")
 	printProfile(t, profiles[0])
+	printProfile(t, profiles[1])
 	for _, sample := range p0samples {
 		p0Count := 0
 		for _, p0sample := range p0samples {
