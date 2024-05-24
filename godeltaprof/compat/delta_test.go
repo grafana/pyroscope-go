@@ -205,6 +205,10 @@ func BenchmarkMutexDelta(b *testing.B) {
 }
 
 func TestMutexDuplicates(t *testing.T) {
+	prev := runtime.SetMutexProfileFraction(-1)
+	runtime.SetMutexProfileFraction(1)
+	defer runtime.SetMutexProfileFraction(prev)
+
 	h := newMutexTestHelper()
 	const cycles = 42
 	p := h.dump(
