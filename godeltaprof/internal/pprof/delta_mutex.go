@@ -1,14 +1,11 @@
 package pprof
 
 import (
-	"io"
 	"runtime"
 )
 
 type DeltaMutexProfiler struct {
-	m       profMap
-	mem     []memMap
-	Options ProfileBuilderOptions
+	m profMap
 }
 
 // PrintCountCycleProfile outputs block profile records (for block or mutex profiles)
@@ -16,16 +13,7 @@ type DeltaMutexProfiler struct {
 // are done because The proto expects count and time (nanoseconds) instead of count
 // and the number of cycles for block, contention profiles.
 // Possible 'scaler' functions are scaleBlockProfile and scaleMutexProfile.
-func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycleName string, scaler MutexProfileScaler, records []runtime.BlockProfileRecord) error {
-	if d.mem == nil || !d.Options.LazyMapping {
-		d.mem = readMapping()
-	}
-	// Output profile in protobuf form.
-	b := newProfileBuilder(w, d.Options, d.mem)
-	b.pbValueType(tagProfile_PeriodType, countName, "count")
-	b.pb.int64Opt(tagProfile_Period, 1)
-	b.pbValueType(tagProfile_SampleType, countName, "count")
-	b.pbValueType(tagProfile_SampleType, cycleName, "nanoseconds")
+func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler MutexProfileScaler, records []runtime.BlockProfileRecord) error {
 
 	cpuGHz := float64(runtime_cyclesPerSecond()) / 1e9
 
@@ -51,9 +39,20 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(w io.Writer, countName, cycl
 
 		// For count profiles, all stack addresses are
 		// return PCs, which is what appendLocsForStack expects.
-		locs = b.appendLocsForStack(locs[:0], r.Stack())
-		b.pbSample(values, locs, nil)
+		locs = b.LocsForStack(r.Stack())
+		b.Sample(values, locs, 0)
 	}
-	b.build()
+	b.Build()
 	return nil
+}
+
+func MutexProfileConfig() ProfileConfig {
+	return ProfileConfig{
+		PeriodType: ValueType{"contentions", "count"},
+		Period:     1,
+		SampleType: []ValueType{
+			{"contentions", "count"},
+			{"delay", "nanoseconds"},
+		},
+	}
 }
