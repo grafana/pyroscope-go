@@ -28,8 +28,9 @@ type profMapEntry struct {
 	nextAll  *profMapEntry // next in list of all entries
 	stk      []uintptr
 	tag      uintptr
-	count    count
+	prev     count
 	acc      count
+	acc2     count //todo make it generic?? drop go16,go17 support?
 }
 
 func (m *profMap) Lookup(stk []uintptr, tag uintptr) *profMapEntry {

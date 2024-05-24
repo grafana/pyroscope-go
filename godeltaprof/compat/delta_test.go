@@ -2,7 +2,9 @@ package compat
 
 import (
 	"fmt"
+	gprofile "github.com/google/pprof/profile"
 	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"runtime"
 	"strings"
@@ -21,10 +23,14 @@ var (
 )
 
 func init() {
-	fs := getFunctionPointers()
-
-	stack0 = [32]uintptr{fs[0], fs[1]}
-	stack1 = [32]uintptr{fs[2], fs[3]}
+	stack0 = [32]uintptr{
+		reflect.ValueOf(assert.Truef).Pointer(),
+		reflect.ValueOf(assert.CallerInfo).Pointer(),
+	}
+	stack1 = [32]uintptr{
+		reflect.ValueOf(assert.Condition).Pointer(),
+		reflect.ValueOf(assert.Conditionf).Pointer(),
+	}
 	stack2 = [32]uintptr{
 		reflect.ValueOf(runtime.GC).Pointer(),
 		reflect.ValueOf(runtime.FuncForPC).Pointer(),
@@ -54,7 +60,7 @@ func init() {
 	}
 	stack0Marker = marker(stack0[:2])
 	stack1Marker = marker(stack1[:2])
-	stack2Marker = marker(stack2[:2])
+	stack2Marker = marker(stack2[2:4])
 }
 
 func TestDeltaHeap(t *testing.T) {
@@ -226,7 +232,7 @@ func TestHeapDuplicates(t *testing.T) {
 	h := newHeapTestHelper()
 	h.rate = testMemProfileRate
 	const blockSize = 1024
-	const blockSize2 = 1024
+	const blockSize2 = 2048
 	p := h.dump(
 		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),
 		h.r(3, 3*blockSize2, 3, 3*blockSize2, stack0),
@@ -236,18 +242,23 @@ func TestHeapDuplicates(t *testing.T) {
 		h.r(5, 5*blockSize, 5, 5*blockSize, stack3),
 		h.r(11, 11*blockSize, 11, 11*blockSize, stack4),
 	)
+	pp, err := gprofile.ParseData(p.Bytes())
+	assert.NoError(t, err)
+
 	scale := func(c, b int) []int64 {
 		c1, b1 := pprof.ScaleHeapSample(int64(c), int64(b), testMemProfileRate)
 		return []int64{c1, b1, 0, 0}
 	}
-	expectStackFrames(t, p, stack0Marker, scale(239+7, (239+7)*blockSize)...)
-	expectStackFrames(t, p, stack1Marker, scale(42, 42*blockSize)...)
+	//expectStackFrames(t, p, stack0Marker, scale(239+7, (239+7)*blockSize)...)
+	//expectStackFrames(t, p, stack1Marker, scale(42, 42*blockSize)...)
 
+	//printProfile(t, p)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack0Marker), 1, scale(239+7, (239+7)*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack1Marker), 1, scale(42, 42*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(3, 3*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(5, 5*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(11, 11*blockSize)...)
+	assert.Equal(t, 6, len(pp.Sample))
 
 	p = h.dump(
 		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),

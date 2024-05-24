@@ -122,11 +122,11 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 		unique = append(unique, s)
 
 	}
-	t.Log("============= stackCollapseProfile ================")
-	for _, s := range unique {
-		t.Log(s.line, s.value)
-	}
-	t.Log("===================================================")
+	//t.Log("============= stackCollapseProfile ================")
+	//for _, s := range unique {
+	//	t.Log(s.line, s.value)
+	//}
+	//t.Log("===================================================")
 
 	return unique
 }

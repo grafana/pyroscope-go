@@ -36,10 +36,10 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 		inanosec := int64(nanosec)
 
 		// do the delta
-		values[0] = count - entry.count.v1
-		values[1] = inanosec - entry.count.v2
-		entry.count.v1 = count
-		entry.count.v2 = inanosec
+		values[0] = count - entry.prev.v1
+		values[1] = inanosec - entry.prev.v2
+		entry.prev.v1 = count
+		entry.prev.v2 = inanosec
 
 		if values[0] < 0 || values[1] < 0 {
 			continue

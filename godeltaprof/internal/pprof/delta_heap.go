@@ -16,6 +16,21 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
 	for _, r := range p {
+		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
+			// it is a fresh bucket and it will be published after next 1-2 gc cycles
+			continue
+		}
+		var blockSize int64
+		if r.AllocObjects > 0 {
+			blockSize = r.AllocBytes / r.AllocObjects
+		}
+		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
+		entry.acc.v1 += r.AllocObjects
+		entry.acc.v2 += r.AllocBytes
+		entry.acc2.v1 += r.InUseObjects()
+		entry.acc2.v2 += r.InUseBytes()
+	}
+	for _, r := range p {
 		// do the delta
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
@@ -27,16 +42,24 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		}
 		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
 
-		if (r.AllocObjects - entry.count.v1) < 0 {
+		if entry.acc.v1 == 0 && entry.acc.v2 == 0 && entry.acc2.v1 == 0 && entry.acc2.v2 == 0 {
 			continue
 		}
-		AllocObjects := r.AllocObjects - entry.count.v1
-		AllocBytes := r.AllocBytes - entry.count.v2
-		entry.count.v1 = r.AllocObjects
-		entry.count.v2 = r.AllocBytes
+
+		//todo minimize the number of fields - use tag and only keep object count, we can always multiply by block size (tag) to get the bytes
+		AllocObjects := entry.acc.v1 - entry.prev.v1
+		if AllocObjects < 0 {
+			continue
+		}
+		AllocBytes := entry.acc.v2 - entry.prev.v2
+		entry.prev.v1 = entry.acc.v1
+		entry.prev.v2 = entry.acc.v2
 
 		values[0], values[1] = ScaleHeapSample(AllocObjects, AllocBytes, rate)
-		values[2], values[3] = ScaleHeapSample(r.InUseObjects(), r.InUseBytes(), rate)
+		values[2], values[3] = ScaleHeapSample(entry.acc2.v1, entry.acc2.v2, rate)
+
+		entry.acc = count{}
+		entry.acc2 = count{}
 
 		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
 			continue
