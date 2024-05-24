@@ -6,8 +6,20 @@ import (
 	"strings"
 )
 
+type heapPrevValue struct {
+	allocObjects int64
+	allocBytes   int64
+}
+
+type heapAccValue struct {
+	allocObjects int64
+	allocBytes   int64
+	inuseObjects int64
+	inuseBytes   int64
+}
+
 type DeltaHeapProfiler struct {
-	m profMap
+	m profMap[heapPrevValue, heapAccValue]
 	//todo consider adding an option to remove block size label and merge allocations of different size
 }
 
@@ -25,10 +37,10 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
 		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
-		entry.acc.v1 += r.AllocObjects
-		entry.acc.v2 += r.AllocBytes
-		entry.acc2.v1 += r.InUseObjects()
-		entry.acc2.v2 += r.InUseBytes()
+		entry.acc.allocObjects += r.AllocObjects
+		entry.acc.allocBytes += r.AllocBytes
+		entry.acc.inuseObjects += r.InUseObjects()
+		entry.acc.inuseBytes += r.InUseBytes()
 	}
 	for _, r := range p {
 		// do the delta
@@ -41,25 +53,23 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
 		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
-
-		if entry.acc.v1 == 0 && entry.acc.v2 == 0 && entry.acc2.v1 == 0 && entry.acc2.v2 == 0 {
+		if entry.acc == (heapAccValue{}) {
 			continue
 		}
 
 		//todo minimize the number of fields - use tag and only keep object count, we can always multiply by block size (tag) to get the bytes
-		AllocObjects := entry.acc.v1 - entry.prev.v1
+		AllocObjects := entry.acc.allocObjects - entry.prev.allocObjects
 		if AllocObjects < 0 {
 			continue
 		}
-		AllocBytes := entry.acc.v2 - entry.prev.v2
-		entry.prev.v1 = entry.acc.v1
-		entry.prev.v2 = entry.acc.v2
+		AllocBytes := entry.acc.allocBytes - entry.prev.allocBytes
+		entry.prev.allocObjects = entry.acc.allocObjects
+		entry.prev.allocBytes = entry.acc.allocBytes
 
 		values[0], values[1] = ScaleHeapSample(AllocObjects, AllocBytes, rate)
-		values[2], values[3] = ScaleHeapSample(entry.acc2.v1, entry.acc2.v2, rate)
+		values[2], values[3] = ScaleHeapSample(entry.acc.inuseObjects, entry.acc.inuseBytes, rate)
 
-		entry.acc = count{}
-		entry.acc2 = count{}
+		entry.acc = heapAccValue{}
 
 		if values[0] == 0 && values[1] == 0 && values[2] == 0 && values[3] == 0 {
 			continue

@@ -4,8 +4,18 @@ import (
 	"runtime"
 )
 
+type mutexPrevValue struct {
+	count    int64
+	inanosec int64
+}
+
+type mutexAccValue struct {
+	count  int64
+	cycles int64
+}
+
 type DeltaMutexProfiler struct {
-	m profMap
+	m profMap[mutexPrevValue, mutexAccValue]
 }
 
 // PrintCountCycleProfile outputs block profile records (for block or mutex profiles)
@@ -21,25 +31,25 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 	var locs []uint64
 	for _, r := range records {
 		entry := d.m.Lookup(r.Stack(), 0)
-		entry.acc.v1 += r.Count // accumulate unscaled
-		entry.acc.v2 += r.Cycles
+		entry.acc.count += r.Count // accumulate unscaled
+		entry.acc.cycles += r.Cycles
 	}
 	for _, r := range records {
 		entry := d.m.Lookup(r.Stack(), 0)
-		accCount := entry.acc.v1
-		accCycles := entry.acc.v2
+		accCount := entry.acc.count
+		accCycles := entry.acc.cycles
 		if accCount == 0 && accCycles == 0 { //todo check if this is correct
 			continue
 		}
-		entry.acc = count{}
+		entry.acc = mutexAccValue{}
 		count, nanosec := ScaleMutexProfile(scaler, accCount, float64(accCycles)/cpuGHz)
 		inanosec := int64(nanosec)
 
 		// do the delta
-		values[0] = count - entry.prev.v1
-		values[1] = inanosec - entry.prev.v2
-		entry.prev.v1 = count
-		entry.prev.v2 = inanosec
+		values[0] = count - entry.prev.count
+		values[1] = inanosec - entry.prev.inanosec
+		entry.prev.count = count
+		entry.prev.inanosec = inanosec
 
 		if values[0] < 0 || values[1] < 0 {
 			continue
