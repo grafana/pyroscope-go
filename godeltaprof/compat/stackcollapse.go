@@ -32,7 +32,7 @@ func printProfile(t *testing.T, p *bytes.Buffer) {
 	require.NoError(t, err)
 	t.Log("==================")
 	for _, sample := range profile.Sample {
-		s := pprofSampleToString(sample)
+		s := pprofSampleStackToString(sample)
 		t.Logf("%v %v %v\n", s, sample.Value, sample.NumLabel)
 	}
 }
@@ -73,7 +73,7 @@ func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sa
 	rr := regexp.MustCompile(samplePattern)
 	var samples []*gprofile.Sample
 	for i := range profile.Sample {
-		ss := pprofSampleToString(profile.Sample[i])
+		ss := pprofSampleStackToString(profile.Sample[i])
 		if !rr.MatchString(ss) {
 			continue
 		}
@@ -95,7 +95,7 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	var ret []stack
 	for _, s := range p.Sample {
-		funcs, strSample := pprofSampleToStrings(s)
+		funcs, strSample := pprofSampleStackToStrings(s)
 		ret = append(ret, stack{
 			line:  strSample,
 			funcs: funcs,
@@ -129,12 +129,12 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	return unique
 }
 
-func pprofSampleToString(s *gprofile.Sample) string {
-	_, v := pprofSampleToStrings(s)
+func pprofSampleStackToString(s *gprofile.Sample) string {
+	_, v := pprofSampleStackToStrings(s)
 	return v
 }
 
-func pprofSampleToStrings(s *gprofile.Sample) ([]string, string) {
+func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
 	var funcs []string
 	for i := range s.Location {
 

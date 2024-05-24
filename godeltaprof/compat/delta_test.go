@@ -312,8 +312,9 @@ func TestMapAlloc(t *testing.T) {
 				p1Count++
 			}
 		}
-		assert.Greater(t, p0Count, 0)
-		assert.Equal(t, p0Count, p1Count)
+		assert.Greaterf(t, p0Count, 0, "sample %v not found in p0", pprofSampleStackToString(sample))
+		assert.Greaterf(t, p1Count, 0, "sample %v not found in p1", pprofSampleStackToString(sample))
+		assert.Equalf(t, p0Count, p1Count, "sampel %v count mismatch %v", pprofSampleStackToString(sample), sample.Value)
 	}
 	assert.Greater(t, len(p0samples), 10)
 }
