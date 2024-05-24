@@ -2,6 +2,7 @@ package compat
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
 	"regexp"
@@ -45,6 +46,7 @@ func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 }
 
 func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, values ...int64) {
+	fmt.Printf("expectStackFrames: %s %+v\n", sfPattern, values)
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
 	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
@@ -61,8 +63,8 @@ func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern stri
 	require.NoError(t, err)
 	cnt := 0
 	samples := grepSamples(profile, samplePattern)
-	for i := range samples {
-		if reflect.DeepEqual(profile.Sample[i].Value, expectedValues) {
+	for _, s := range samples {
+		if reflect.DeepEqual(s.Value, expectedValues) {
 			cnt++
 		}
 	}

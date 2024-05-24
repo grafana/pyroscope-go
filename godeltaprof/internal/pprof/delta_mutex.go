@@ -20,11 +20,22 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 	values := []int64{0, 0}
 	var locs []uint64
 	for _, r := range records {
-		count, nanosec := ScaleMutexProfile(scaler, r.Count, float64(r.Cycles)/cpuGHz)
+		entry := d.m.Lookup(r.Stack(), 0)
+		entry.acc.v1 += r.Count // accumulate unscaled
+		entry.acc.v2 += r.Cycles
+	}
+	for _, r := range records {
+		entry := d.m.Lookup(r.Stack(), 0)
+		accCount := entry.acc.v1
+		accCycles := entry.acc.v2
+		if accCount == 0 && accCycles == 0 { //todo check if this is correct
+			continue
+		}
+		entry.acc = count{}
+		count, nanosec := ScaleMutexProfile(scaler, accCount, float64(accCycles)/cpuGHz)
 		inanosec := int64(nanosec)
 
 		// do the delta
-		entry := d.m.Lookup(r.Stack(), 0)
 		values[0] = count - entry.count.v1
 		values[1] = inanosec - entry.count.v2
 		entry.count.v1 = count

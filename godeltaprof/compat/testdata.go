@@ -221,6 +221,12 @@ func (h *mutexTestHelper) scale(rcount, rcycles int64) (int64, int64) {
 	inanosec := int64(nanosec)
 	return count, inanosec
 }
+
+func (h *mutexTestHelper) scale2(rcount, rcycles int64) []int64 {
+	c, n := h.scale(rcount, rcycles)
+	return []int64{c, n}
+}
+
 func (h *mutexTestHelper) dump(r ...runtime.BlockProfileRecord) *bytes.Buffer {
 	buf := bytes.NewBuffer(nil)
 	err := PrintCountCycleProfile(h.dp, h.opt, buf, h.scaler, r)

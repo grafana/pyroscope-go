@@ -206,8 +206,12 @@ func TestMutexDuplicates(t *testing.T) {
 		h.r(42, 42*cycles, stack1),
 		h.r(7, 7*cycles, stack0),
 	)
-	expectStackFrames(t, p, stack0Marker, 239+7, (239+7)*cycles)
-	expectStackFrames(t, p, stack1Marker, 239+7, (239+7)*cycles)
+
+	expectStackFrames(t, p, stack0Marker, h.scale2(239+7, (239+7)*cycles)...)
+	expectStackFrames(t, p, stack1Marker, h.scale2(42, (42)*cycles)...)
+
+	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack0Marker), 1, h.scale2(239+7, (239+7)*cycles)...)
+	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack1Marker), 1, h.scale2(42, 42*cycles)...)
 
 	p = h.dump(
 		h.r(239, 239*cycles, stack0),

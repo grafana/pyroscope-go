@@ -29,6 +29,7 @@ type profMapEntry struct {
 	stk      []uintptr
 	tag      uintptr
 	count    count
+	acc      count
 }
 
 func (m *profMap) Lookup(stk []uintptr, tag uintptr) *profMapEntry {
