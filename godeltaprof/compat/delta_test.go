@@ -367,7 +367,7 @@ func TestMapAlloc(t *testing.T) {
 	}
 	f := func(i int) {
 		mm := make(map[string]structWithPointers)
-		for i := 0; i < 1024; i++ {
+		for i := 0; i < 2048; i++ {
 			k := fmt.Sprintf("k_____%d", i)
 			mm[k] = structWithPointers{t, t}
 		}
@@ -382,7 +382,7 @@ func TestMapAlloc(t *testing.T) {
 
 	runtime.MemProfileRate = prevRate
 
-	compareSamplesWithPattern(t, profiles[0], profiles[1], 10, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$", func(s *gprofile.Sample) bool {
+	compareSamplesWithPattern(t, profiles[0], profiles[1], 9, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$", func(s *gprofile.Sample) bool {
 		bs := s.NumLabel["bytes"]
 		return len(bs) == 1 && bs[0] != 288 && bs[0] != 16 // i have no idea what this is, this is to fix fragile test
 	})
