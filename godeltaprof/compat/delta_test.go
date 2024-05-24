@@ -193,6 +193,7 @@ func BenchmarkMutexDelta(b *testing.B) {
 //	const blockSize = 1024
 //	p := h.dump(
 //		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),
+// todo add a record with the same stack but different values
 //		h.r(42, 42*blockSize, 42, 42*blockSize, stack1),
 //		h.r(7, 7*blockSize, 7, 7*blockSize, stack0),
 //	)
