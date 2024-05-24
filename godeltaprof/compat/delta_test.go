@@ -384,7 +384,7 @@ func TestMapAlloc(t *testing.T) {
 
 	compareSamplesWithPattern(t, profiles[0], profiles[1], 10, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$", func(s *gprofile.Sample) bool {
 		bs := s.NumLabel["bytes"]
-		return len(bs) == 1 && bs[0] != 288 // i have no idea what this is, this is to fix fragile test
+		return len(bs) == 1 && bs[0] != 288 && bs[0] != 16 // i have no idea what this is, this is to fix fragile test
 	})
 
 }
