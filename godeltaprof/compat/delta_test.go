@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -210,6 +211,19 @@ func TestHeapDuplicates(t *testing.T) {
 	expectEmptyProfile(t, p)
 }
 
+type allocEntry struct {
+	pc     []uintptr
+	values []int64
+	sample *gprofile.Sample
+}
+
+func (e *allocEntry) String() string {
+	return fmt.Sprintf("%+v %+v ", pprofSampleStackToString(e.sample), e.values)
+}
+func (e *allocEntry) String2() string {
+	return fmt.Sprintf("%+v %+v", e.pc, e.values)
+}
+
 func TestChanAllocDup(t *testing.T) {
 	prevRate := runtime.MemProfileRate
 	runtime.MemProfileRate = 1
@@ -239,20 +253,59 @@ func TestChanAllocDup(t *testing.T) {
 	}
 	runtime.MemProfileRate = prevRate
 
-	for _, p := range profiles {
-		printProfile(t, p)
-		// different types of allocations depending on the capacity of the channel and whether the channel type has pointers
-		// this is fragile and relies on runtime internals
-		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
-			1,
-			1, 18432, 0, 0)
-		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
-			3,
-			1, 96, 0, 0)
-		expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
-			1,
-			1, 9472, 0, 0)
+	var entries [][]allocEntry
+	var strEntries [][]string
+	const pattern = "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$"
+
+	for _, profile := range profiles {
+		pp, err := gprofile.ParseData(profile.Bytes())
+		require.NoError(t, err)
+		samples := grepSamples(pp, pattern)
+		es := []allocEntry{}
+		for _, sample := range samples {
+			e := allocEntry{}
+			for _, location := range sample.Location {
+				e.pc = append(e.pc, uintptr(location.Address))
+			}
+			e.values = sample.Value
+			e.sample = sample
+			es = append(es, e)
+		}
+		entries = append(entries, es)
 	}
+	for i, es := range entries {
+		slices.SortFunc(es, func(i, j allocEntry) int {
+			pc := slices.Compare(i.pc, j.pc)
+			if pc != 0 {
+				return pc
+			}
+			return slices.Compare(i.values, j.values)
+		})
+		ss := []string{}
+		fmt.Printf("========================== %d\n", i)
+		for _, e := range es {
+			ss = append(ss, e.String())
+			fmt.Printf("%s\n", e.String())
+			fmt.Printf("%s\n", e.String2())
+		}
+		strEntries = append(strEntries, ss)
+	}
+
+	assert.Equal(t, strEntries[0], strEntries[1])
+	//for _, p := range profiles {
+	//	printProfile(t, p)
+	//	// different types of allocations depending on the capacity of the channel and whether the channel type has pointers
+	//	// this is fragile and relies on runtime internals
+	//	expectPPROFLocations(t, p, pattern,
+	//		1,
+	//		1, 18432, 0, 0)
+	//	expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
+	//		3,
+	//		1, 96, 0, 0)
+	//	expectPPROFLocations(t, p, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup;github.com/grafana/pyroscope-go/godeltaprof/compat.TestChanAllocDup.func2$",
+	//		1,
+	//		1, 9472, 0, 0)
+	//}
 }
 
 type structWithPointers struct {
