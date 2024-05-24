@@ -297,6 +297,7 @@ func TestMapAlloc(t *testing.T) {
 	require.NoError(t, err)
 
 	p0samples := grepSamples(p0, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$")
+	p1samples := grepSamples(p1, "^testing.tRunner;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc;github.com/grafana/pyroscope-go/godeltaprof/compat.TestMapAlloc.func2$")
 	printProfile(t, profiles[0])
 	printProfile(t, profiles[1])
 	for _, sample := range p0samples {
@@ -307,7 +308,7 @@ func TestMapAlloc(t *testing.T) {
 			}
 		}
 		p1Count := 0
-		for _, p1sample := range p1.Sample {
+		for _, p1sample := range p1samples {
 			if reflect.DeepEqual(sample.Value, p1sample.Value) {
 				p1Count++
 			}
