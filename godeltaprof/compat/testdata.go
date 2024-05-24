@@ -1,16 +1,13 @@
 package compat
 
 import (
-	"go/types"
+	"bytes"
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
+	"github.com/stretchr/testify/assert"
+	"io"
 	"math/rand"
 	"reflect"
 	"runtime"
-	"strings"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/tools/go/packages"
 )
 
 func getFunctionPointers() []uintptr {
@@ -160,12 +157,12 @@ func getFunctionPointers() []uintptr {
 	}
 }
 
-func generateMemProfileRecords(n, depth, seed int) []runtime.MemProfileRecord {
+func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemProfileRecord {
 	var records []runtime.MemProfileRecord
-	rng := rand.NewSource(int64(seed))
+
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
-		nobj := int(uint64(rng.Int63())) % 1000000
+		nobj := int(uint64(h.rng.Int63())) % 1000000
 		r := runtime.MemProfileRecord{
 			AllocObjects: int64(nobj),
 			AllocBytes:   int64(nobj * 1024),
@@ -173,53 +170,159 @@ func generateMemProfileRecords(n, depth, seed int) []runtime.MemProfileRecord {
 			FreeBytes:    int64(nobj * 1024),
 		}
 		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(rng.Int63()))%len(fs)]
+			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)]
 		}
 		records = append(records, r)
 	}
 	return records
 }
 
-func generateBlockProfileRecords(n, depth, seed int) []runtime.BlockProfileRecord {
+func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []runtime.BlockProfileRecord {
 	var records []runtime.BlockProfileRecord
-	rng := rand.NewSource(int64(seed))
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
-		nobj := int(uint64(rng.Int63())) % 1000000
+		nobj := int(uint64(h.rng.Int63())) % 1000000
 		r := runtime.BlockProfileRecord{
 			Count:  int64(nobj),
 			Cycles: int64(nobj * 10),
 		}
 		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(rng.Int63()))%len(fs)]
+			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)]
 		}
 		records = append(records, r)
 	}
 	return records
 }
 
-func getFunctions(t testing.TB, pkg string) []*types.Func {
-	var res []*types.Func
-	cfg := &packages.Config{
-		Mode:  packages.NeedImports | packages.NeedExportFile | packages.NeedTypes | packages.NeedSyntax,
-		Tests: true,
-	}
-	pkgs, err := packages.Load(cfg, pkg)
-	require.NoError(t, err)
-	for _, p := range pkgs {
-		if strings.Contains(p.ID, ".test") {
-			continue
-		}
-		for _, name := range p.Types.Scope().Names() {
-			f := p.Types.Scope().Lookup(name)
+type mutexTestHelper struct {
+	dp     *pprof.DeltaMutexProfiler
+	opt    *pprof.ProfileBuilderOptions
+	scaler pprof.MutexProfileScaler
+	rng    rand.Source
+}
 
-			if f != nil {
-				ff, ok := f.(*types.Func)
-				if ok {
-					res = append(res, ff)
-				}
-			}
-		}
+func newMutexTestHelper() *mutexTestHelper {
+	res := &mutexTestHelper{
+		dp: &pprof.DeltaMutexProfiler{},
+		opt: &pprof.ProfileBuilderOptions{
+			GenericsFrames: true,
+			LazyMapping:    true,
+		},
+		scaler: pprof.ScalerMutexProfile,
+		rng:    rand.NewSource(239),
 	}
 	return res
+
+}
+
+func (h *mutexTestHelper) scale(rcount, rcycles int64) (int64, int64) {
+	cpuGHz := float64(pprof.Runtime_cyclesPerSecond()) / 1e9
+	count, nanosec := pprof.ScaleMutexProfile(h.scaler, rcount, float64(rcycles)/cpuGHz)
+	inanosec := int64(nanosec)
+	return count, inanosec
+}
+func (h *mutexTestHelper) dump(r ...runtime.BlockProfileRecord) *bytes.Buffer {
+	buf := bytes.NewBuffer(nil)
+	err := PrintCountCycleProfile(h.dp, h.opt, buf, h.scaler, r)
+	if err != nil { // never happens
+		panic(err)
+	}
+	return buf
+}
+
+func (h *mutexTestHelper) r(count, cycles int64, s [32]uintptr) runtime.BlockProfileRecord {
+	return runtime.BlockProfileRecord{
+		Count:  count,
+		Cycles: cycles,
+		StackRecord: runtime.StackRecord{
+			Stack0: s,
+		},
+	}
+}
+
+func (h *mutexTestHelper) mutate(fs []runtime.BlockProfileRecord) {
+	nmutations := int(h.rng.Int63() % int64(len(fs)))
+	oneBlockCycles := fs[0].Cycles / fs[0].Count
+	for j := 0; j < nmutations; j++ {
+		idx := int(uint(h.rng.Int63())) % len(fs)
+		fs[idx].Count += 1
+		fs[idx].Cycles += oneBlockCycles
+	}
+}
+
+type heapTestHelper struct {
+	dp   *pprof.DeltaHeapProfiler
+	opt  *pprof.ProfileBuilderOptions
+	rate int64
+	rng  rand.Source
+}
+
+func newHeapTestHelper() *heapTestHelper {
+	res := &heapTestHelper{
+		dp: &pprof.DeltaHeapProfiler{},
+		opt: &pprof.ProfileBuilderOptions{
+			GenericsFrames: true,
+			LazyMapping:    true,
+		},
+		rng:  rand.NewSource(239),
+		rate: int64(runtime.MemProfileRate),
+	}
+	return res
+}
+
+func (h *heapTestHelper) dump(r ...runtime.MemProfileRecord) *bytes.Buffer {
+	buf := bytes.NewBuffer(nil)
+	err := WriteHeapProto(h.dp, h.opt, buf, r, h.rate)
+	if err != nil { // never happens
+		panic(err)
+	}
+	return buf
+}
+
+func (h *heapTestHelper) r(AllocObjects, AllocBytes, FreeObjects, FreeBytes int64, s [32]uintptr) runtime.MemProfileRecord {
+	return runtime.MemProfileRecord{
+		AllocObjects: AllocObjects,
+		AllocBytes:   AllocBytes,
+		FreeBytes:    FreeBytes,
+		FreeObjects:  FreeObjects,
+		Stack0:       s,
+	}
+}
+
+func (h *heapTestHelper) mutate(fs []runtime.MemProfileRecord) {
+	nmutations := int(h.rng.Int63() % int64(len(fs)))
+	objSize := fs[0].AllocBytes / fs[0].AllocObjects
+	for j := 0; j < nmutations; j++ {
+		idx := int(uint(h.rng.Int63())) % len(fs)
+		fs[idx].AllocObjects += 1
+		fs[idx].AllocBytes += objSize
+		fs[idx].FreeObjects += 1
+		fs[idx].FreeBytes += objSize
+	}
+}
+
+func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, p []runtime.MemProfileRecord, rate int64) error {
+	stc := pprof.HeapProfileConfig(rate)
+	b := pprof.NewProfileBuilder(w, opt, stc)
+	return dp.WriteHeapProto(b, p, rate)
+}
+
+func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
+	stc := pprof.MutexProfileConfig()
+	b := pprof.NewProfileBuilder(w, opt, stc)
+	return d.PrintCountCycleProfile(b, scaler, records)
+}
+
+type noopBuilder struct {
+}
+
+func (b *noopBuilder) LocsForStack(_ []uintptr) []uint64 {
+	return nil
+}
+func (b *noopBuilder) Sample(_ []int64, _ []uint64, _ int64) {
+
+}
+
+func (b *noopBuilder) Build() {
+
 }
