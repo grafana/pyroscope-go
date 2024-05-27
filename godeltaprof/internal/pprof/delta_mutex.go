@@ -29,13 +29,16 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 
 	values := []int64{0, 0}
 	var locs []uint64
-	for _, r := range records {
-		entry := d.m.Lookup(r.Stack(), 0)
+	for i := range records {
+		r := &records[i]
+		entry := d.m.Lookup(stack(r.Stack0[:]), 0)
 		entry.acc.count += r.Count // accumulate unscaled
 		entry.acc.cycles += r.Cycles
 	}
-	for _, r := range records {
-		entry := d.m.Lookup(r.Stack(), 0)
+	for i := range records {
+		r := &records[i]
+		stk := stack(r.Stack0[:])
+		entry := d.m.Lookup(stk, 0)
 		accCount := entry.acc.count
 		accCycles := entry.acc.cycles
 		if accCount == 0 && accCycles == 0 { //todo check if this is correct
@@ -60,7 +63,7 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 
 		// For count profiles, all stack addresses are
 		// return PCs, which is what appendLocsForStack expects.
-		locs = b.LocsForStack(r.Stack())
+		locs = b.LocsForStack(stk)
 		b.Sample(values, locs, 0)
 	}
 	b.Build()

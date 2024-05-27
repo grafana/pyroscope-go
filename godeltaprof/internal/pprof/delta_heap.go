@@ -27,7 +27,8 @@ type DeltaHeapProfiler struct {
 func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProfileRecord, rate int64) error {
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
-	for _, r := range p {
+	for i := range p {
+		r := &p[i]
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
 			continue
@@ -36,13 +37,14 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
+		entry := d.m.Lookup(stack(r.Stack0[:]), uintptr(blockSize))
 		entry.acc.allocObjects += r.AllocObjects
 		entry.acc.allocBytes += r.AllocBytes
 		entry.acc.inuseObjects += r.InUseObjects()
 		entry.acc.inuseBytes += r.InUseBytes()
 	}
-	for _, r := range p {
+	for i := range p {
+		r := &p[i]
 		// do the delta
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
@@ -52,7 +54,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
+		entry := d.m.Lookup(stack(r.Stack0[:]), uintptr(blockSize))
 		if entry.acc == (heapAccValue{}) {
 			continue
 		}
@@ -77,7 +79,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 
 		hideRuntime := true
 		for tries := 0; tries < 2; tries++ {
-			stk := r.Stack()
+			stk := stack(r.Stack0[:])
 			// For heap profiles, all stack
 			// addresses are return PCs, which is
 			// what appendLocsForStack expects.
@@ -142,4 +144,13 @@ func HeapProfileConfig(rate int64) ProfileConfig {
 		},
 		DefaultSampleType: "",
 	}
+}
+
+func stack(stk []uintptr) []uintptr {
+	for i, v := range stk {
+		if v == 0 {
+			return stk[0:i]
+		}
+	}
+	return stk
 }

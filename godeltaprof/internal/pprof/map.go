@@ -16,12 +16,6 @@ type profMap[PREV any, ACC any] struct {
 	freeStk []uintptr
 }
 
-type count struct {
-	// alloc_objects, alloc_bytes for heap
-	// mutex_count, mutex_duration for mutex
-	v1, v2 int64
-}
-
 // A profMapEntry is a single entry in the profMap.
 // todo remove nextAll
 // todo use unsafe.Pointer + len for stk ?
