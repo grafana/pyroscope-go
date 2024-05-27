@@ -10,18 +10,14 @@ import "unsafe"
 // It grows without bound, but that's assumed to be OK.
 type profMap[PREV any, ACC any] struct {
 	hash    map[uintptr]*profMapEntry[PREV, ACC]
-	all     *profMapEntry[PREV, ACC]
-	last    *profMapEntry[PREV, ACC]
 	free    []profMapEntry[PREV, ACC]
 	freeStk []uintptr
 }
 
 // A profMapEntry is a single entry in the profMap.
-// todo remove nextAll
 // todo use unsafe.Pointer + len for stk ?
 type profMapEntry[PREV any, ACC any] struct {
 	nextHash *profMapEntry[PREV, ACC] // next in hash list
-	nextAll  *profMapEntry[PREV, ACC] // next in list of all entries
 	stk      []uintptr
 	tag      uintptr
 	prev     PREV
@@ -82,12 +78,5 @@ Search:
 		m.hash = make(map[uintptr]*profMapEntry[PREV, ACC])
 	}
 	m.hash[h] = e
-	if m.all == nil {
-		m.all = e
-		m.last = e
-	} else {
-		m.last.nextAll = e
-		m.last = e
-	}
 	return e
 }
