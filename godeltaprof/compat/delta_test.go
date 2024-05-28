@@ -203,11 +203,20 @@ func BenchmarkMutexDelta(b *testing.B) {
 			h.scaler = scaler
 			fs := h.generateBlockProfileRecords(512, 32)
 			builder := &noopBuilder{}
+			h.rng.Seed(239)
+			nmutations := int(h.rng.Int63() % int64(len(fs)))
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
+				if i == 1000 {
+					v := h.rng.Int63()
+					if v != 7817861117094116717 {
+						b.Errorf("unexpected random value: %d. "+
+							"The bench should be deterministic for better comparision.", v)
+					}
+				}
 				_ = h.dp.PrintCountCycleProfile(builder, scaler, fs)
-				h.mutate(fs)
+				h.mutate(nmutations, fs)
 			}
 		})
 

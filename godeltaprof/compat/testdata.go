@@ -246,8 +246,7 @@ func (h *mutexTestHelper) r(count, cycles int64, s [32]uintptr) runtime.BlockPro
 	}
 }
 
-func (h *mutexTestHelper) mutate(fs []runtime.BlockProfileRecord) {
-	nmutations := int(h.rng.Int63() % int64(len(fs)))
+func (h *mutexTestHelper) mutate(nmutations int, fs []runtime.BlockProfileRecord) {
 	oneBlockCycles := fs[0].Cycles / fs[0].Count
 	for j := 0; j < nmutations; j++ {
 		idx := int(uint(h.rng.Int63())) % len(fs)
