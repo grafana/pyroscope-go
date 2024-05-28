@@ -172,10 +172,9 @@ func BenchmarkHeapDelta(b *testing.B) {
 	fs := h.generateMemProfileRecords(512, 32)
 	builder := &noopBuilder{}
 	b.ResetTimer()
-	nmutations := int(h.rng.Int63() % int64(len(fs)))
 	for i := 0; i < b.N; i++ {
 		_ = h.dp.WriteHeapProto(builder, fs, int64(runtime.MemProfileRate))
-		h.mutate(nmutations, fs)
+		h.mutate(fs)
 	}
 }
 

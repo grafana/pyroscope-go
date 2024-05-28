@@ -10,10 +10,9 @@ func BenchmarkHeapCompression(b *testing.B) {
 	h := newHeapTestHelper()
 	fs := h.generateMemProfileRecords(512, 32)
 	b.ResetTimer()
-	nmutations := int(h.rng.Int63() % int64(len(fs)))
 	for i := 0; i < b.N; i++ {
 		_ = WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
-		h.mutate(nmutations, fs)
+		h.mutate(fs)
 	}
 }
 
