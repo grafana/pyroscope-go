@@ -8,14 +8,11 @@ import (
 
 type heapPrevValue struct {
 	allocObjects int64
-	allocBytes   int64
 }
 
 type heapAccValue struct {
 	allocObjects int64
-	allocBytes   int64
 	inuseObjects int64
-	inuseBytes   int64
 }
 
 type DeltaHeapProfiler struct {
@@ -39,9 +36,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		}
 		entry := d.m.Lookup(stack(r.Stack0[:]), uintptr(blockSize))
 		entry.acc.allocObjects += r.AllocObjects
-		entry.acc.allocBytes += r.AllocBytes
 		entry.acc.inuseObjects += r.InUseObjects()
-		entry.acc.inuseBytes += r.InUseBytes()
 	}
 	for i := range p {
 		r := &p[i]
@@ -59,17 +54,15 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 			continue
 		}
 
-		//todo minimize the number of fields - use tag and only keep object count, we can always multiply by block size (tag) to get the bytes
 		AllocObjects := entry.acc.allocObjects - entry.prev.allocObjects
 		if AllocObjects < 0 {
 			continue
 		}
-		AllocBytes := entry.acc.allocBytes - entry.prev.allocBytes
+		AllocBytes := AllocObjects * blockSize
 		entry.prev.allocObjects = entry.acc.allocObjects
-		entry.prev.allocBytes = entry.acc.allocBytes
 
 		values[0], values[1] = ScaleHeapSample(AllocObjects, AllocBytes, rate)
-		values[2], values[3] = ScaleHeapSample(entry.acc.inuseObjects, entry.acc.inuseBytes, rate)
+		values[2], values[3] = ScaleHeapSample(entry.acc.inuseObjects, entry.acc.inuseObjects*blockSize, rate)
 
 		entry.acc = heapAccValue{}
 
