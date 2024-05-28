@@ -295,10 +295,9 @@ func (h *heapTestHelper) r(AllocObjects, AllocBytes, FreeObjects, FreeBytes int6
 	}
 }
 
-func (h *heapTestHelper) mutate(fs []runtime.MemProfileRecord) {
-	nmutations := int(h.rng.Int63() % int64(len(fs)))
+func (h *heapTestHelper) mutate(n int, fs []runtime.MemProfileRecord) {
 	objSize := fs[0].AllocBytes / fs[0].AllocObjects
-	for j := 0; j < nmutations; j++ {
+	for j := 0; j < n; j++ {
 		idx := int(uint(h.rng.Int63())) % len(fs)
 		fs[idx].AllocObjects += 1
 		fs[idx].AllocBytes += objSize
