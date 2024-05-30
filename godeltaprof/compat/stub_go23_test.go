@@ -36,6 +36,9 @@ func TestRuntimeCyclesPerSecond(t *testing.T) {
 	checkSignature(t, "runtime",
 		"pprof_cyclesPerSecond",
 		"func runtime.pprof_cyclesPerSecond() int64")
+	checkSignature(t, "runtime/pprof",
+		"pprof_cyclesPerSecond",
+		"func runtime/pprof.pprof_cyclesPerSecond() int64")
 	checkSignature(t, "github.com/grafana/pyroscope-go/godeltaprof/internal/pprof",
 		"runtime_cyclesPerSecond",
 		"func github.com/grafana/pyroscope-go/godeltaprof/internal/pprof.runtime_cyclesPerSecond() int64")
