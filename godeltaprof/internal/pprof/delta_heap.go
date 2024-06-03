@@ -24,6 +24,7 @@ type DeltaHeapProfiler struct {
 func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProfileRecord, rate int64) error {
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
+	// deduplicate: accumulate allocObjects and inuseObjects in entry.acc for equal stacks
 	for i := range p {
 		r := &p[i]
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
@@ -38,9 +39,9 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		entry.acc.allocObjects += r.AllocObjects
 		entry.acc.inuseObjects += r.InUseObjects()
 	}
+	// do the delta using the accumulated values and previous values
 	for i := range p {
 		r := &p[i]
-		// do the delta
 		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
 			continue

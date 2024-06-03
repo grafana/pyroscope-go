@@ -29,12 +29,15 @@ func (d *DeltaMutexProfiler) PrintCountCycleProfile(b ProfileBuilder, scaler Mut
 
 	values := []int64{0, 0}
 	var locs []uint64
+	// deduplicate: accumulate count and cycles in entry.acc for equal stacks
 	for i := range records {
 		r := &records[i]
 		entry := d.m.Lookup(r.Stack(), 0)
 		entry.acc.count += r.Count // accumulate unscaled
 		entry.acc.cycles += r.Cycles
 	}
+
+	// do the delta using the accumulated values and previous values
 	for i := range records {
 		r := &records[i]
 		stk := r.Stack()
