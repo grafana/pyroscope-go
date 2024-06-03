@@ -34,7 +34,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(stack(r.Stack0[:]), uintptr(blockSize))
+		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
 		entry.acc.allocObjects += r.AllocObjects
 		entry.acc.inuseObjects += r.InUseObjects()
 	}
@@ -49,20 +49,26 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(stack(r.Stack0[:]), uintptr(blockSize))
+		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
 		if entry.acc == (heapAccValue{}) {
 			continue
 		}
 
-		AllocObjects := entry.acc.allocObjects - entry.prev.allocObjects
-		if AllocObjects < 0 {
+		allocObjects := entry.acc.allocObjects - entry.prev.allocObjects
+		if allocObjects < 0 {
 			continue
 		}
-		AllocBytes := AllocObjects * blockSize
-		entry.prev.allocObjects = entry.acc.allocObjects
 
-		values[0], values[1] = ScaleHeapSample(AllocObjects, AllocBytes, rate)
-		values[2], values[3] = ScaleHeapSample(entry.acc.inuseObjects, entry.acc.inuseObjects*blockSize, rate)
+		// allocBytes, inuseBytes is calculated as multiplication of number of objects by blockSize
+		// This is done to reduce the size of the map entry (i.e. heapAccValue for deduplication and
+		// heapPrevValue for keeping the delta).
+
+		allocBytes := allocObjects * blockSize
+		entry.prev.allocObjects = entry.acc.allocObjects
+		inuseBytes := entry.acc.inuseObjects * blockSize
+
+		values[0], values[1] = ScaleHeapSample(allocObjects, allocBytes, rate)
+		values[2], values[3] = ScaleHeapSample(entry.acc.inuseObjects, inuseBytes, rate)
 
 		entry.acc = heapAccValue{}
 
@@ -72,7 +78,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 
 		hideRuntime := true
 		for tries := 0; tries < 2; tries++ {
-			stk := stack(r.Stack0[:])
+			stk := r.Stack()
 			// For heap profiles, all stack
 			// addresses are return PCs, which is
 			// what appendLocsForStack expects.
@@ -137,13 +143,4 @@ func HeapProfileConfig(rate int64) ProfileConfig {
 		},
 		DefaultSampleType: "",
 	}
-}
-
-func stack(stk []uintptr) []uintptr {
-	for i, v := range stk {
-		if v == 0 {
-			return stk[0:i]
-		}
-	}
-	return stk
 }
