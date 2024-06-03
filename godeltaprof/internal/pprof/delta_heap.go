@@ -1,34 +1,17 @@
 package pprof
 
 import (
-	"io"
 	"math"
 	"runtime"
 	"strings"
 )
 
 type DeltaHeapProfiler struct {
-	m       profMap
-	mem     []memMap
-	Options ProfileBuilderOptions
+	m profMap
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
-func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRecord, rate int64, defaultSampleType string) error {
-	if d.mem == nil || !d.Options.LazyMapping {
-		d.mem = readMapping()
-	}
-	b := newProfileBuilder(w, d.Options, d.mem)
-	b.pbValueType(tagProfile_PeriodType, "space", "bytes")
-	b.pb.int64Opt(tagProfile_Period, rate)
-	b.pbValueType(tagProfile_SampleType, "alloc_objects", "count")
-	b.pbValueType(tagProfile_SampleType, "alloc_space", "bytes")
-	b.pbValueType(tagProfile_SampleType, "inuse_objects", "count")
-	b.pbValueType(tagProfile_SampleType, "inuse_space", "bytes")
-	if defaultSampleType != "" {
-		b.pb.int64Opt(tagProfile_DefaultSampleType, b.stringIndex(defaultSampleType))
-	}
-
+func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProfileRecord, rate int64) error {
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
 	for _, r := range p {
@@ -74,20 +57,16 @@ func (d *DeltaHeapProfiler) WriteHeapProto(w io.Writer, p []runtime.MemProfileRe
 					break
 				}
 			}
-			locs = b.appendLocsForStack(locs[:0], stk)
+			locs = b.LocsForStack(stk)
 			if len(locs) > 0 {
 				break
 			}
 			hideRuntime = false // try again, and show all frames next time.
 		}
 
-		b.pbSample(values, locs, func() {
-			if blockSize != 0 {
-				b.pbLabel(tagSample_Label, "bytes", "", blockSize)
-			}
-		})
+		b.Sample(values, locs, blockSize)
 	}
-	b.build()
+	b.Build()
 	return nil
 }
 
@@ -115,4 +94,18 @@ func scaleHeapSample(count, size, rate int64) (int64, int64) {
 	scale := 1 / (1 - math.Exp(-avgSize/float64(rate)))
 
 	return int64(float64(count) * scale), int64(float64(size) * scale)
+}
+
+func HeapProfileConfig(rate int64) ProfileConfig {
+	return ProfileConfig{
+		PeriodType: ValueType{Typ: "space", Unit: "bytes"},
+		Period:     rate,
+		SampleType: []ValueType{
+			{"alloc_objects", "count"},
+			{"alloc_space", "bytes"},
+			{"inuse_objects", "count"},
+			{"inuse_space", "bytes"},
+		},
+		DefaultSampleType: "",
+	}
 }
