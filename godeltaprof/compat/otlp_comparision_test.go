@@ -27,7 +27,7 @@ func TestOTLPHeap(t *testing.T) {
 		LazyMappings:   true,
 	})
 
-	for i := 0; i < 10124; i++ {
+	for i := 0; i < 1024; i++ {
 		if i == 1000 {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
@@ -49,7 +49,10 @@ func TestOTLPHeap(t *testing.T) {
 
 }
 
-func TestOTLPBlock(t *testing.T) {
+func TestOTLPMutex(t *testing.T) {
+	period := runtime.SetMutexProfileFraction(-1)
+	defer runtime.SetMutexProfileFraction(period)
+	runtime.SetMutexProfileFraction(1)
 	h := newMutexTestHelper()
 	fs := h.generateBlockProfileRecords(512, 32)
 	h.rng.Seed(239)
@@ -58,7 +61,7 @@ func TestOTLPBlock(t *testing.T) {
 		GenericsFrames: true,
 		LazyMappings:   true,
 	}
-	otlp := otlp.NewBlockProfilerWithOptions(opt)
+	otlp := otlp.NewMutexProfilerWithOptions(opt)
 	for i := 0; i < 1024; i++ {
 		if i == 1000 {
 			v := h.rng.Int63()
@@ -96,7 +99,8 @@ func compareOTLP(t *testing.T, pprofBytes *bytes.Buffer, otlp *otlpprofile.Profi
 		otlpSamples = append(otlpSamples, fmt.Sprintf("%s %+v", otlpSampleStackToString(otlp, s), s.Value))
 	}
 	sort.Slice(otlpSamples, func(i, j int) bool { return otlpSamples[i] < otlpSamples[j] })
-	assert.Equal(t, pprofSamples, otlpSamples)
+	require.Equal(t, pprofSamples, otlpSamples)
+	require.Greater(t, len(pprofSamples), 0)
 }
 
 func BenchmarkPPROFNoCompression(b *testing.B) {
