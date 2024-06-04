@@ -13,11 +13,10 @@ import (
 )
 
 func TestHeapReject(t *testing.T) {
-	dh := new(pprof.DeltaHeapProfiler)
-	opt := new(pprof.ProfileBuilderOptions)
-	fs := generateMemProfileRecords(512, 32, 239)
+	h := newHeapTestHelper()
+	fs := h.generateMemProfileRecords(512, 32)
 	p1 := bytes.NewBuffer(nil)
-	err := WriteHeapProto(dh, opt, p1, fs, int64(runtime.MemProfileRate))
+	err := WriteHeapProto(h.dp, h.opt, p1, fs, int64(runtime.MemProfileRate))
 	assert.NoError(t, err)
 	p1Size := p1.Len()
 	profile, err := gprofile.Parse(p1)
@@ -28,7 +27,7 @@ func TestHeapReject(t *testing.T) {
 	t.Log("p1 size", p1Size)
 
 	p2 := bytes.NewBuffer(nil)
-	err = WriteHeapProto(dh, opt, p2, fs, int64(runtime.MemProfileRate))
+	err = WriteHeapProto(h.dp, h.opt, p2, fs, int64(runtime.MemProfileRate))
 	assert.NoError(t, err)
 	p2Size := p2.Len()
 	assert.Less(t, p2Size, 1000)
@@ -41,15 +40,11 @@ func TestHeapReject(t *testing.T) {
 }
 
 func BenchmarkHeapRejectOrder(b *testing.B) {
-	opt := &pprof.ProfileBuilderOptions{
-		GenericsFrames: false,
-		LazyMapping:    true,
-	}
-	dh := &pprof.DeltaHeapProfiler{}
-	fs := generateMemProfileRecords(512, 32, 239)
+	h := newHeapTestHelper()
+	fs := h.generateMemProfileRecords(512, 32)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		WriteHeapProto(dh, opt, io.Discard, fs, int64(runtime.MemProfileRate))
+		WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
 	}
 }
 
@@ -69,11 +64,11 @@ func TestMutexReject(t *testing.T) {
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			dh := new(pprof.DeltaMutexProfiler)
-			opt := new(pprof.ProfileBuilderOptions)
-			fs := generateBlockProfileRecords(512, 32, 239)
+			h := newMutexTestHelper()
+			h.scaler = scaler
+			fs := h.generateBlockProfileRecords(512, 32)
 			p1 := bytes.NewBuffer(nil)
-			err := PrintCountCycleProfile(dh, opt, p1, scaler, fs)
+			err := PrintCountCycleProfile(h.dp, h.opt, p1, scaler, fs)
 			assert.NoError(t, err)
 			p1Size := p1.Len()
 			profile, err := gprofile.Parse(p1)
@@ -84,7 +79,7 @@ func TestMutexReject(t *testing.T) {
 			t.Log("p1 size", p1Size)
 
 			p2 := bytes.NewBuffer(nil)
-			err = PrintCountCycleProfile(dh, opt, p2, scaler, fs)
+			err = PrintCountCycleProfile(h.dp, h.opt, p2, scaler, fs)
 			assert.NoError(t, err)
 			p2Size := p2.Len()
 			assert.Less(t, p2Size, 1000)
@@ -108,16 +103,13 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
 			runtime.SetMutexProfileFraction(5)
 			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
-			opt := &pprof.ProfileBuilderOptions{
-				GenericsFrames: false,
-				LazyMapping:    true,
-			}
-			dh := &pprof.DeltaMutexProfiler{}
-			fs := generateBlockProfileRecords(512, 32, 239)
+			h := newMutexTestHelper()
+			h.scaler = scaler
+			fs := h.generateBlockProfileRecords(512, 32)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				PrintCountCycleProfile(dh, opt, io.Discard, scaler, fs)
+				PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
 			}
 		})
 

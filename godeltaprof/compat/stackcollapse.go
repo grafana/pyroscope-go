@@ -2,7 +2,9 @@ package compat
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -26,6 +28,16 @@ func expectEmptyProfile(t *testing.T, buffer io.Reader) {
 	assert.Empty(t, ls)
 }
 
+func printProfile(t *testing.T, p *bytes.Buffer) {
+	profile, err := gprofile.Parse(bytes.NewBuffer(p.Bytes()))
+	require.NoError(t, err)
+	t.Log("==================")
+	for _, sample := range profile.Sample {
+		s := pprofSampleStackToString(sample)
+		t.Logf("%v %v %v\n", s, sample.Value, sample.NumLabel)
+	}
+}
+
 func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
@@ -34,6 +46,7 @@ func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 }
 
 func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, values ...int64) {
+	fmt.Printf("expectStackFrames: %s %+v\n", sfPattern, values)
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
 	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
@@ -43,6 +56,32 @@ func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, val
 			assert.Equalf(t, values[i], line.value[i], "expected %v got %v", values, line.value)
 		}
 	}
+}
+
+func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern string, expectedCount int, expectedValues ...int64) {
+	profile, err := gprofile.ParseData(buffer.Bytes())
+	require.NoError(t, err)
+	cnt := 0
+	samples := grepSamples(profile, samplePattern)
+	for _, s := range samples {
+		if reflect.DeepEqual(s.Value, expectedValues) {
+			cnt++
+		}
+	}
+	assert.Equalf(t, expectedCount, cnt, "expected samples re: %s\n   values: %v\n    count:%d\n    all samples:%+v\n", samplePattern, expectedValues, expectedCount, samples)
+}
+
+func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sample {
+	rr := regexp.MustCompile(samplePattern)
+	var samples []*gprofile.Sample
+	for i := range profile.Sample {
+		ss := pprofSampleStackToString(profile.Sample[i])
+		if !rr.MatchString(ss) {
+			continue
+		}
+		samples = append(samples, profile.Sample[i])
+	}
+	return samples
 }
 
 func findStack(t *testing.T, res []stack, re string) *stack {
@@ -58,23 +97,9 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	var ret []stack
 	for _, s := range p.Sample {
-		var funcs []string
-		for i := range s.Location {
-
-			loc := s.Location[i]
-			for _, line := range loc.Line {
-				f := line.Function
-				//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
-				funcs = append(funcs, f.Name)
-			}
-		}
-		for i := 0; i < len(funcs)/2; i++ {
-			j := len(funcs) - i - 1
-			funcs[i], funcs[j] = funcs[j], funcs[i]
-		}
-
+		funcs, strSample := pprofSampleStackToStrings(s)
 		ret = append(ret, stack{
-			line:  strings.Join(funcs, ";"),
+			line:  strSample,
 			funcs: funcs,
 			value: s.Value,
 		})
@@ -97,11 +122,36 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 		unique = append(unique, s)
 
 	}
-	t.Log("============= stackCollapseProfile ================")
-	for _, s := range unique {
-		t.Log(s.line, s.value)
-	}
-	t.Log("===================================================")
+	//t.Log("============= stackCollapseProfile ================")
+	//for _, s := range unique {
+	//	t.Log(s.line, s.value)
+	//}
+	//t.Log("===================================================")
 
 	return unique
+}
+
+func pprofSampleStackToString(s *gprofile.Sample) string {
+	_, v := pprofSampleStackToStrings(s)
+	return v
+}
+
+func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
+	var funcs []string
+	for i := range s.Location {
+
+		loc := s.Location[i]
+		for _, line := range loc.Line {
+			f := line.Function
+			//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
+			funcs = append(funcs, f.Name)
+		}
+	}
+	for i := 0; i < len(funcs)/2; i++ {
+		j := len(funcs) - i - 1
+		funcs[i], funcs[j] = funcs[j], funcs[i]
+	}
+
+	strSample := strings.Join(funcs, ";")
+	return funcs, strSample
 }

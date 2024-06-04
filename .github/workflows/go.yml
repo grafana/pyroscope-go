@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.16', '1.17', '1.18', '1.19', '1.20', '1.21', '1.22', 'tip']
+        go: ['1.18', '1.19', '1.20', '1.21', '1.22', 'tip']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -21,11 +21,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
-      - name: Downgrade go.mod for go 1.17 and go 1.16
-        if:  matrix.go == '1.17' || matrix.go == '1.16'
-        run: make go/mod_16_for_testing
       - name: Run go/mod
-        if:  matrix.go != '1.17' && matrix.go != '1.16'
         run: make go/mod && git diff --exit-code
       - name: Install Go stable
         if: matrix.go == 'tip'
