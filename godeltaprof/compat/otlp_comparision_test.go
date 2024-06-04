@@ -11,7 +11,7 @@ import (
 	otlpprofile "go.opentelemetry.io/proto/otlp/profiles/v1experimental"
 	"google.golang.org/protobuf/proto"
 	"runtime"
-	"slices"
+	"sort"
 	"testing"
 )
 
@@ -86,14 +86,14 @@ func compareOTLP(t *testing.T, pprofBytes *bytes.Buffer, otlp *otlpprofile.Profi
 		assert.GreaterOrEqual(t, len(s.Value), 2)
 		pprofSamples = append(pprofSamples, fmt.Sprintf("%s %+v", pprofSampleStackToString(s), s.Value))
 	}
-	slices.Sort(pprofSamples)
+	sort.Slice(pprofSamples, func(i, j int) bool { return pprofSamples[i] < pprofSamples[j] })
 
 	otlpSamples := make([]string, 0, len(otlp.Sample))
 	for _, s := range otlp.Sample {
 		assert.GreaterOrEqual(t, len(s.Value), 2)
 		otlpSamples = append(otlpSamples, fmt.Sprintf("%s %+v", otlpSampleStackToString(otlp, s), s.Value))
 	}
-	slices.Sort(otlpSamples)
+	sort.Slice(otlpSamples, func(i, j int) bool { return otlpSamples[i] < otlpSamples[j] })
 	assert.Equal(t, pprofSamples, otlpSamples)
 }
 
