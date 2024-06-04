@@ -16,9 +16,9 @@ import (
 )
 
 type ProfileBuilderOptions struct {
-	// for go1.21+ if true - use runtime_FrameSymbolName - produces Frames with generic types, for example [go.shape.int]
-	// for go1.21+ if false - use runtime.Frame->Function - produces Frames with generic types ommited [...]
-	// pre 1.21 - always use runtime.Frame->Function - produces Frames with generic types ommited [...]
+	// for go1.21+ if true - use runtime_FrameSymbolName - produces frames with generic types, for example [go.shape.int]
+	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]
+	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
 	GenericsFrames bool
 	LazyMapping    bool
 	NoCompression  bool
@@ -69,7 +69,7 @@ type MemMap struct {
 // symbolizeFlag keeps track of symbolization result.
 //
 //	0                  : no symbol lookup was performed
-//	1<<0 (LookupTried) : symbol lookup was performed
+//	1<<0 (lookupTried) : symbol lookup was performed
 //	1<<1 (lookupFailed): symbol lookup was performed but failed
 type SymbolizeFlag uint8
 
@@ -221,7 +221,7 @@ func AllFrames(addr uintptr) ([]runtime.Frame, SymbolizeFlag) {
 	// Expand this one address using CallersFrames so we can cache
 	// each expansion. In general, CallersFrames takes a whole
 	// stack, but in this case we know there will be no skips in
-	// the stack and we have return PCS anyway.
+	// the stack and we have return PCs anyway.
 	frames := runtime.CallersFrames([]uintptr{addr})
 	frame, more := frames.Next()
 	if frame.Function == "runtime.goexit" {
@@ -252,7 +252,7 @@ type locInfo struct {
 	// location id assigned by the profileBuilder
 	id uint64
 
-	// sequence of PCS, including the fake PCS returned by the traceback
+	// sequence of PCs, including the fake PCs returned by the traceback
 	// to represent inlined functions
 	// https://github.com/golang/go/blob/d6f2f833c93a41ec1c68e49804b8387a06b131c5/src/runtime/traceback.go#L347-L368
 	pcs []uintptr
@@ -311,7 +311,7 @@ func (b *profileBuilder) Build() {
 	}
 
 	for i, m := range b.mem {
-		hasFunctions := m.Funcs == LookupTried // LookupTried but not lookupFailed
+		hasFunctions := m.Funcs == LookupTried // lookupTried but not lookupFailed
 		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.Start), uint64(m.End), m.Offset, m.File, m.BuildID, hasFunctions)
 	}
 
@@ -325,7 +325,7 @@ func (b *profileBuilder) Build() {
 }
 
 // LocsForStack appends the location IDs for the given stack trace to the given
-// location ID slice, locs. The addresses in the stack are return PCS or 1 + the PC of
+// location ID slice, locs. The addresses in the stack are return PCs or 1 + the PC of
 // an inline marker as the runtime traceback function returns.
 //
 // It may return an empty slice even if locs is non-empty, for example if locs consists
@@ -337,7 +337,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 	locs := b.tmplocs[:0]
 	b.deck.Reset()
 
-	// The last frame might be truncated. Recover lost inline Frames.
+	// The last frame might be truncated. Recover lost inline frames.
 	stk = runtime_expandFinalInlineFrame(stk)
 
 	for len(stk) > 0 {
@@ -347,7 +347,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			// NOP instructions to the outermost function as a placeholder for
 			// each layer of inlining. When the runtime generates tracebacks for
 			// stacks that include inlined functions, it uses the addresses of
-			// those NOPs as "fake" PCS on the stack as if they were regular
+			// those NOPs as "fake" PCs on the stack as if they were regular
 			// function call sites. But if a profiling signal arrives while the
 			// CPU is executing one of those NOPs, its PC will show up as a leaf
 			// in the profile with its own Location entry. So, always check
@@ -392,7 +392,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			continue
 		}
 		// add failed because this addr is not inlined with the
-		// existing PCS in the deck. Flush the deck and retry handling
+		// existing PCs in the deck. Flush the deck and retry handling
 		// this pc.
 		if id := b.emitLocation(); id > 0 {
 			locs = append(locs, id)
@@ -426,7 +426,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 // NOPL at 0x4553ed (for line 6) being called by the NOPL at 0x4553ec (for line
 // 9).
 //
-// The role of pcDeck is to collapse those three Frames back into a single
+// The role of pcDeck is to collapse those three frames back into a single
 // location at 0x4553ee, with file/line/function symbolization info representing
 // the three layers of calls. It does that via sequential calls to pcDeck.tryAdd
 // starting with the leaf-most address. The fourth call to pcDeck.tryAdd will be
@@ -453,7 +453,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 //	Frame's Name does not match its entry function frame's name (note: inlined functions cannot be directly recursive).
 //
 // As reading and processing the pcs in a stack trace one by one (from leaf to the root),
-// we use pcDeck to temporarily hold the observed pcs and their expanded Frames
+// we use pcDeck to temporarily hold the observed pcs and their expanded frames
 // until we observe the entry function frame.
 type PCDeck struct {
 	PCS             []uintptr
