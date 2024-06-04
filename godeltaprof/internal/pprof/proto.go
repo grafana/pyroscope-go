@@ -6,6 +6,7 @@ package pprof
 
 import (
 	"bytes"
+	"github.com/klauspost/compress/gzip"
 	"io"
 	"os"
 	"runtime"
@@ -14,23 +15,19 @@ import (
 	"time"
 )
 
-// lostProfileEvent is the function to which lost profiling
-// events are attributed.
-// (The name shows up in the pprof graphs.)
-func lostProfileEvent() { lostProfileEvent() }
-
 type ProfileBuilderOptions struct {
-	// for go1.21+ if true - use runtime_FrameSymbolName - produces frames with generic types, for example [go.shape.int]
-	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]
-	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
+	// for go1.21+ if true - use runtime_FrameSymbolName - produces Frames with generic types, for example [go.shape.int]
+	// for go1.21+ if false - use runtime.Frame->Function - produces Frames with generic types ommited [...]
+	// pre 1.21 - always use runtime.Frame->Function - produces Frames with generic types ommited [...]
 	GenericsFrames bool
 	LazyMapping    bool
-	mem            []memMap
+	NoCompression  bool
+	mem            []MemMap
 }
 
-func (d *ProfileBuilderOptions) mapping() []memMap {
+func (d *ProfileBuilderOptions) Mapping() []MemMap {
 	if d.mem == nil || !d.LazyMapping {
-		d.mem = readMapping()
+		d.mem = ReadMapping()
 	}
 	return d.mem
 }
@@ -44,42 +41,41 @@ type profileBuilder struct {
 	period     int64
 
 	// encoding state
-	w         io.Writer
-	zw        gzipWriter
+	zw        io.WriteCloser
 	pb        protobuf
 	strings   []string
 	stringMap map[string]int
 	locs      map[uintptr]locInfo // list of locInfo starting with the given PC.
 	funcs     map[string]int      // Package path-qualified function name to Function.ID
-	mem       []memMap
-	deck      pcDeck
+	mem       []MemMap
+	deck      PCDeck
 	tmplocs   []uint64
 
 	opt *ProfileBuilderOptions
 }
 
-type memMap struct {
+type MemMap struct {
 	// initialized as reading mapping
-	start   uintptr // Address at which the binary (or DLL) is loaded into memory.
-	end     uintptr // The limit of the address range occupied by this mapping.
-	offset  uint64  // Offset in the binary that corresponds to the first mapped address.
-	file    string  // The object this entry is loaded from.
-	buildID string  // A string that uniquely identifies a particular program version with high probability.
+	Start   uintptr // Address at which the binary (or DLL) is loaded into memory.
+	End     uintptr // The limit of the address range occupied by this mapping.
+	Offset  uint64  // Offset in the binary that corresponds to the first mapped address.
+	File    string  // The object this entry is loaded from.
+	BuildID string  // A string that uniquely identifies a particular program version with high probability.
 
-	funcs symbolizeFlag
-	fake  bool // map entry was faked; /proc/self/maps wasn't available
+	Funcs SymbolizeFlag
+	Fake  bool // map entry was faked; /proc/self/maps wasn't available
 }
 
 // symbolizeFlag keeps track of symbolization result.
 //
 //	0                  : no symbol lookup was performed
-//	1<<0 (lookupTried) : symbol lookup was performed
+//	1<<0 (LookupTried) : symbol lookup was performed
 //	1<<1 (lookupFailed): symbol lookup was performed but failed
-type symbolizeFlag uint8
+type SymbolizeFlag uint8
 
 const (
-	lookupTried  symbolizeFlag = 1 << iota
-	lookupFailed symbolizeFlag = 1 << iota
+	LookupTried  SymbolizeFlag = 1 << iota
+	LookupFailed SymbolizeFlag = 1 << iota
 )
 
 const (
@@ -221,11 +217,11 @@ func (b *profileBuilder) pbMapping(tag int, id, base, limit, offset uint64, file
 	b.pb.endMessage(tag, start)
 }
 
-func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
+func AllFrames(addr uintptr) ([]runtime.Frame, SymbolizeFlag) {
 	// Expand this one address using CallersFrames so we can cache
 	// each expansion. In general, CallersFrames takes a whole
 	// stack, but in this case we know there will be no skips in
-	// the stack and we have return PCs anyway.
+	// the stack and we have return PCS anyway.
 	frames := runtime.CallersFrames([]uintptr{addr})
 	frame, more := frames.Next()
 	if frame.Function == "runtime.goexit" {
@@ -234,9 +230,9 @@ func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
 		return nil, 0
 	}
 
-	symbolizeResult := lookupTried
+	symbolizeResult := LookupTried
 	if frame.PC == 0 || frame.Function == "" || frame.File == "" || frame.Line == 0 {
-		symbolizeResult |= lookupFailed
+		symbolizeResult |= LookupFailed
 	}
 
 	if frame.PC == 0 {
@@ -256,15 +252,15 @@ type locInfo struct {
 	// location id assigned by the profileBuilder
 	id uint64
 
-	// sequence of PCs, including the fake PCs returned by the traceback
+	// sequence of PCS, including the fake PCS returned by the traceback
 	// to represent inlined functions
 	// https://github.com/golang/go/blob/d6f2f833c93a41ec1c68e49804b8387a06b131c5/src/runtime/traceback.go#L347-L368
 	pcs []uintptr
 
 	// firstPCFrames and firstPCSymbolizeResult hold the results of the
-	// allFrames call for the first (leaf-most) PC this locInfo represents
+	// AllFrames call for the first (leaf-most) PC this locInfo represents
 	firstPCFrames          []runtime.Frame
-	firstPCSymbolizeResult symbolizeFlag
+	firstPCSymbolizeResult SymbolizeFlag
 }
 
 // NewProfileBuilder returns a new profileBuilder.
@@ -272,9 +268,14 @@ type locInfo struct {
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
 func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfig) ProfileBuilder {
-	zw := newGzipWriter(w)
+	var zw io.WriteCloser
+	if opt.NoCompression {
+		zw = nopCloser{w}
+	} else {
+		gzw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		zw = gzw
+	}
 	b := &profileBuilder{
-		w:         w,
 		zw:        zw,
 		start:     time.Now(),
 		strings:   []string{""},
@@ -284,7 +285,7 @@ func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfi
 		opt:       opt,
 		tmplocs:   make([]uint64, 0, 128),
 	}
-	b.mem = opt.mapping()
+	b.mem = opt.Mapping()
 	b.pbValueType(tagProfile_PeriodType, stc.PeriodType.Typ, stc.PeriodType.Unit)
 	b.pb.int64Opt(tagProfile_Period, stc.Period)
 	for _, st := range stc.SampleType {
@@ -297,7 +298,7 @@ func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfi
 }
 
 // Build completes and returns the constructed profile.
-func (b *profileBuilder) Build() {
+func (b *profileBuilder) Build() error {
 	b.end = time.Now()
 
 	b.pb.int64Opt(tagProfile_TimeNanos, b.start.UnixNano())
@@ -310,8 +311,8 @@ func (b *profileBuilder) Build() {
 	}
 
 	for i, m := range b.mem {
-		hasFunctions := m.funcs == lookupTried // lookupTried but not lookupFailed
-		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.start), uint64(m.end), m.offset, m.file, m.buildID, hasFunctions)
+		hasFunctions := m.Funcs == LookupTried // LookupTried but not lookupFailed
+		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.Start), uint64(m.End), m.Offset, m.File, m.BuildID, hasFunctions)
 	}
 
 	// TODO: Anything for tagProfile_DropFrames?
@@ -320,10 +321,11 @@ func (b *profileBuilder) Build() {
 	b.pb.strings(tagProfile_StringTable, b.strings)
 	b.zw.Write(b.pb.data)
 	b.zw.Close()
+	return nil
 }
 
 // LocsForStack appends the location IDs for the given stack trace to the given
-// location ID slice, locs. The addresses in the stack are return PCs or 1 + the PC of
+// location ID slice, locs. The addresses in the stack are return PCS or 1 + the PC of
 // an inline marker as the runtime traceback function returns.
 //
 // It may return an empty slice even if locs is non-empty, for example if locs consists
@@ -333,9 +335,9 @@ func (b *profileBuilder) Build() {
 // It may emit to b.pb, so there must be no message encoding in progress.
 func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 	locs := b.tmplocs[:0]
-	b.deck.reset()
+	b.deck.Reset()
 
-	// The last frame might be truncated. Recover lost inline frames.
+	// The last frame might be truncated. Recover lost inline Frames.
 	stk = runtime_expandFinalInlineFrame(stk)
 
 	for len(stk) > 0 {
@@ -345,15 +347,15 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			// NOP instructions to the outermost function as a placeholder for
 			// each layer of inlining. When the runtime generates tracebacks for
 			// stacks that include inlined functions, it uses the addresses of
-			// those NOPs as "fake" PCs on the stack as if they were regular
+			// those NOPs as "fake" PCS on the stack as if they were regular
 			// function call sites. But if a profiling signal arrives while the
 			// CPU is executing one of those NOPs, its PC will show up as a leaf
 			// in the profile with its own Location entry. So, always check
 			// whether addr is a "fake" PC in the context of the current call
 			// stack by trying to add it to the inlining deck before assuming
 			// that the deck is complete.
-			if len(b.deck.pcs) > 0 {
-				if added := b.deck.tryAdd(addr, l.firstPCFrames, l.firstPCSymbolizeResult); added {
+			if len(b.deck.PCS) > 0 {
+				if added := b.deck.TryAdd(addr, l.firstPCFrames, l.firstPCSymbolizeResult); added {
 					stk = stk[1:]
 					continue
 				}
@@ -376,7 +378,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			continue
 		}
 
-		frames, symbolizeResult := allFrames(addr)
+		frames, symbolizeResult := AllFrames(addr)
 		if len(frames) == 0 { // runtime.goexit.
 			if id := b.emitLocation(); id > 0 {
 				locs = append(locs, id)
@@ -385,12 +387,12 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			continue
 		}
 
-		if added := b.deck.tryAdd(addr, frames, symbolizeResult); added {
+		if added := b.deck.TryAdd(addr, frames, symbolizeResult); added {
 			stk = stk[1:]
 			continue
 		}
 		// add failed because this addr is not inlined with the
-		// existing PCs in the deck. Flush the deck and retry handling
+		// existing PCS in the deck. Flush the deck and retry handling
 		// this pc.
 		if id := b.emitLocation(); id > 0 {
 			locs = append(locs, id)
@@ -401,7 +403,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			locs = append(locs, l.id)
 			stk = stk[len(l.pcs):] // skip the matching pcs.
 		} else {
-			b.deck.tryAdd(addr, frames, symbolizeResult) // must succeed.
+			b.deck.TryAdd(addr, frames, symbolizeResult) // must succeed.
 			stk = stk[1:]
 		}
 	}
@@ -424,7 +426,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 // NOPL at 0x4553ed (for line 6) being called by the NOPL at 0x4553ec (for line
 // 9).
 //
-// The role of pcDeck is to collapse those three frames back into a single
+// The role of pcDeck is to collapse those three Frames back into a single
 // location at 0x4553ee, with file/line/function symbolization info representing
 // the three layers of calls. It does that via sequential calls to pcDeck.tryAdd
 // starting with the leaf-most address. The fourth call to pcDeck.tryAdd will be
@@ -451,38 +453,38 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 //	Frame's Name does not match its entry function frame's name (note: inlined functions cannot be directly recursive).
 //
 // As reading and processing the pcs in a stack trace one by one (from leaf to the root),
-// we use pcDeck to temporarily hold the observed pcs and their expanded frames
+// we use pcDeck to temporarily hold the observed pcs and their expanded Frames
 // until we observe the entry function frame.
-type pcDeck struct {
-	pcs             []uintptr
-	frames          []runtime.Frame
-	symbolizeResult symbolizeFlag
+type PCDeck struct {
+	PCS             []uintptr
+	Frames          []runtime.Frame
+	SymbolizeResult SymbolizeFlag
 
-	// firstPCFrames indicates the number of frames associated with the first
+	// firstPCFrames indicates the number of Frames associated with the first
 	// (leaf-most) PC in the deck
-	firstPCFrames int
-	// firstPCSymbolizeResult holds the results of the allFrames call for the
+	FirstPCFrames int
+	// firstPCSymbolizeResult holds the results of the AllFrames call for the
 	// first (leaf-most) PC in the deck
-	firstPCSymbolizeResult symbolizeFlag
+	FirstPCSymbolizeResult SymbolizeFlag
 }
 
-func (d *pcDeck) reset() {
-	d.pcs = d.pcs[:0]
-	d.frames = d.frames[:0]
-	d.symbolizeResult = 0
-	d.firstPCFrames = 0
-	d.firstPCSymbolizeResult = 0
+func (d *PCDeck) Reset() {
+	d.PCS = d.PCS[:0]
+	d.Frames = d.Frames[:0]
+	d.SymbolizeResult = 0
+	d.FirstPCFrames = 0
+	d.FirstPCSymbolizeResult = 0
 }
 
 // tryAdd tries to add the pc and Frames expanded from it (most likely one,
 // since the stack trace is already fully expanded) and the symbolizeResult
 // to the deck. If it fails the caller needs to flush the deck and retry.
-func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symbolizeFlag) (success bool) {
-	if existing := len(d.frames); existing > 0 {
-		// 'd.frames' are all expanded from one 'pc' and represent all
+func (d *PCDeck) TryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult SymbolizeFlag) (success bool) {
+	if existing := len(d.Frames); existing > 0 {
+		// 'd.Frames' are all expanded from one 'pc' and represent all
 		// inlined functions so we check only the last one.
 		newFrame := frames[0]
-		last := d.frames[existing-1]
+		last := d.Frames[existing-1]
 		if last.Func != nil { // the last frame can't be inlined. Flush.
 			return false
 		}
@@ -497,12 +499,12 @@ func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symb
 			return false
 		}
 	}
-	d.pcs = append(d.pcs, pc)
-	d.frames = append(d.frames, frames...)
-	d.symbolizeResult |= symbolizeResult
-	if len(d.pcs) == 1 {
-		d.firstPCFrames = len(d.frames)
-		d.firstPCSymbolizeResult = symbolizeResult
+	d.PCS = append(d.PCS, pc)
+	d.Frames = append(d.Frames, frames...)
+	d.SymbolizeResult |= symbolizeResult
+	if len(d.PCS) == 1 {
+		d.FirstPCFrames = len(d.Frames)
+		d.FirstPCSymbolizeResult = symbolizeResult
 	}
 	return true
 }
@@ -512,13 +514,13 @@ func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symb
 // It emits to b.pb, so there must be no message encoding in progress.
 // It resets the deck.
 func (b *profileBuilder) emitLocation() uint64 {
-	if len(b.deck.pcs) == 0 {
+	if len(b.deck.PCS) == 0 {
 		return 0
 	}
-	defer b.deck.reset()
+	defer b.deck.Reset()
 
-	addr := b.deck.pcs[0]
-	firstFrame := b.deck.frames[0]
+	addr := b.deck.PCS[0]
+	firstFrame := b.deck.Frames[0]
 
 	// We can't write out functions while in the middle of the
 	// Location message, so record new functions we encounter and
@@ -533,15 +535,15 @@ func (b *profileBuilder) emitLocation() uint64 {
 	id := uint64(len(b.locs)) + 1
 	b.locs[addr] = locInfo{
 		id:                     id,
-		pcs:                    append([]uintptr{}, b.deck.pcs...),
-		firstPCSymbolizeResult: b.deck.firstPCSymbolizeResult,
-		firstPCFrames:          append([]runtime.Frame{}, b.deck.frames[:b.deck.firstPCFrames]...),
+		pcs:                    append([]uintptr{}, b.deck.PCS...),
+		firstPCSymbolizeResult: b.deck.FirstPCSymbolizeResult,
+		firstPCFrames:          append([]runtime.Frame{}, b.deck.Frames[:b.deck.FirstPCFrames]...),
 	}
 
 	start := b.pb.startMessage()
 	b.pb.uint64Opt(tagLocation_ID, id)
 	b.pb.uint64Opt(tagLocation_Address, uint64(firstFrame.PC))
-	for _, frame := range b.deck.frames {
+	for _, frame := range b.deck.Frames {
 		// Write out each line in frame expansion.
 		funcName := runtime_FrameSymbolName(&frame)
 		funcID := uint64(b.funcs[funcName])
@@ -564,11 +566,11 @@ func (b *profileBuilder) emitLocation() uint64 {
 		b.pbLine(tagLocation_Line, funcID, int64(frame.Line))
 	}
 	for i := range b.mem {
-		if b.mem[i].start <= addr && addr < b.mem[i].end || b.mem[i].fake {
+		if b.mem[i].Start <= addr && addr < b.mem[i].End || b.mem[i].Fake {
 			b.pb.uint64Opt(tagLocation_MappingID, uint64(i+1))
 
 			m := b.mem[i]
-			m.funcs |= b.deck.symbolizeResult
+			m.Funcs |= b.deck.SymbolizeResult
 			b.mem[i] = m
 			break
 		}
@@ -590,27 +592,27 @@ func (b *profileBuilder) emitLocation() uint64 {
 	return id
 }
 
-func readMapping() []memMap {
+func ReadMapping() []MemMap {
 	data, _ := os.ReadFile("/proc/self/maps")
-	var mem []memMap
+	var mem []MemMap
 	parseProcSelfMaps(data, func(lo, hi, offset uint64, file, buildID string) {
-		mem = append(mem, memMap{
-			start:   uintptr(lo),
-			end:     uintptr(hi),
-			offset:  offset,
-			file:    file,
-			buildID: buildID,
-			fake:    false,
+		mem = append(mem, MemMap{
+			Start:   uintptr(lo),
+			End:     uintptr(hi),
+			Offset:  offset,
+			File:    file,
+			BuildID: buildID,
+			Fake:    false,
 		})
 	})
 	if len(mem) == 0 { // pprof expects a map entry, so fake one.
-		mem = []memMap{{
-			start:   uintptr(0),
-			end:     uintptr(0),
-			offset:  0,
-			file:    "",
-			buildID: "",
-			fake:    true,
+		mem = []MemMap{{
+			Start:   uintptr(0),
+			End:     uintptr(0),
+			Offset:  0,
+			File:    "",
+			BuildID: "",
+			Fake:    true,
 		}}
 	}
 	return mem

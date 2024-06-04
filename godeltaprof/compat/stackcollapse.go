@@ -3,6 +3,7 @@ package compat
 import (
 	"bytes"
 	"fmt"
+	otlpprofile "go.opentelemetry.io/proto/otlp/profiles/v1experimental"
 	"io"
 	"reflect"
 	"regexp"
@@ -154,4 +155,24 @@ func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
 
 	strSample := strings.Join(funcs, ";")
 	return funcs, strSample
+}
+
+func otlpSampleStackToString(p *otlpprofile.Profile, s *otlpprofile.Sample) string {
+	var funcs []string
+	indicis := p.LocationIndices[s.LocationsStartIndex : s.LocationsStartIndex+s.LocationsLength]
+	for _, i := range indicis {
+		loc := p.Location[i]
+		for _, line := range loc.Line {
+			f := p.Function[line.FunctionIndex]
+			funcs = append(funcs, p.StringTable[f.Name])
+		}
+	}
+	for i := 0; i < len(funcs)/2; i++ {
+		j := len(funcs) - i - 1
+		funcs[i], funcs[j] = funcs[j], funcs[i]
+	}
+
+	res := strings.Join(funcs, ";")
+	return res
+
 }
