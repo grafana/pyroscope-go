@@ -1,5 +1,4 @@
 //go:build go1.21 && !go1.23
-// +build go1.21,!go1.23
 
 package compat
 

@@ -1,6 +1,6 @@
 module github.com/grafana/pyroscope-go/godeltaprof/otlp
 
-go 1.16
+go 1.19
 
 require (
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.6
