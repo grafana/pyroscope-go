@@ -298,7 +298,7 @@ func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfi
 }
 
 // Build completes and returns the constructed profile.
-func (b *profileBuilder) Build() error {
+func (b *profileBuilder) Build() {
 	b.end = time.Now()
 
 	b.pb.int64Opt(tagProfile_TimeNanos, b.start.UnixNano())
@@ -321,7 +321,7 @@ func (b *profileBuilder) Build() error {
 	b.pb.strings(tagProfile_StringTable, b.strings)
 	b.zw.Write(b.pb.data)
 	b.zw.Close()
-	return nil
+	return
 }
 
 // LocsForStack appends the location IDs for the given stack trace to the given

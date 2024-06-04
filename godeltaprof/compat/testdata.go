@@ -346,7 +346,6 @@ func (b *noopBuilder) Sample(_ []int64, _ []uint64, _ int64) {
 
 }
 
-func (b *noopBuilder) Build() error {
-	return nil
+func (b *noopBuilder) Build() {
 
 }

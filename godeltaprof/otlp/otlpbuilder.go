@@ -86,7 +86,7 @@ func (b *otlpProtoBuilder) Sample(values []int64, locs []uint64, _ int64) {
 
 }
 
-func (b *otlpProtoBuilder) Build() error {
+func (b *otlpProtoBuilder) Build() {
 	b.res.StringTable = b.strings
 	b.res.LocationIndices = b.locIndex
 	b.res.TimeNanos = b.start.UnixNano()
@@ -105,7 +105,7 @@ func (b *otlpProtoBuilder) Build() error {
 			HasFunctions: hasFunctions,
 		})
 	}
-	return nil
+	return
 }
 
 func (b *otlpProtoBuilder) Proto() *otlpprofile.Profile {
