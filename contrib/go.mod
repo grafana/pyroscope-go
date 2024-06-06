@@ -1,6 +1,6 @@
 module github.com/grafana/pyroscope-go/contrib
 
-go 1.22
+go 1.22.3
 
 require (
 	github.com/grafana/pyroscope-go v1.1.1
