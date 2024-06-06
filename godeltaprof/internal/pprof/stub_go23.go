@@ -23,5 +23,5 @@ func runtime_FrameSymbolName(f *runtime.Frame) string
 //go:linkname runtime_expandFinalInlineFrame runtime/pprof.runtime_expandFinalInlineFrame
 func runtime_expandFinalInlineFrame(stk []uintptr) []uintptr
 
-//go:linkname runtime_cyclesPerSecond runtime.pprof_cyclesPerSecond
+//go:linkname runtime_cyclesPerSecond runtime/pprof.runtime_cyclesPerSecond
 func runtime_cyclesPerSecond() int64
