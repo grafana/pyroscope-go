@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime/pprof"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,113 +18,10 @@ func Test_getBaggageLabels(t *testing.T) {
 			"blank": "",
 		})
 
-		filters := []FilterFunc{}
-		transforms := []TransformFunc{}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
+		labelSet := getBaggageLabels(req)
 		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{}
-		require.Equal(t, expectedLabels, gotLabels)
-	})
-
-	t.Run("no filters or transforms", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://example.com", nil)
-		req = testRequestWithBaggage(t, req, map[string]string{
-			"k6.test_run_id":        "123",
-			"not_k6.some_other_key": "value",
-		})
-
-		filters := []FilterFunc{}
-		transforms := []TransformFunc{}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, *labelSet)
-
-		expectedLabels := map[string]string{
-			"k6.test_run_id":        "123",
-			"not_k6.some_other_key": "value",
-		}
-		require.Equal(t, expectedLabels, gotLabels)
-	})
-
-	t.Run("with filters", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://example.com", nil)
-		req = testRequestWithBaggage(t, req, map[string]string{
-			"k6.test_run_id":        "123",
-			"not_k6.some_other_key": "value",
-		})
-
-		filters := []FilterFunc{
-			func(m baggage.Member) bool {
-				return strings.HasPrefix(m.Key(), "k6.")
-			},
-		}
-		transforms := []TransformFunc{}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, *labelSet)
-
-		expectedLabels := map[string]string{
-			"k6.test_run_id": "123",
-		}
-		require.Equal(t, expectedLabels, gotLabels)
-	})
-
-	t.Run("with transforms", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://example.com", nil)
-		req = testRequestWithBaggage(t, req, map[string]string{
-			"k6.test_run_id":        "123",
-			"not_k6.some_other_key": "value",
-		})
-
-		filters := []FilterFunc{}
-		transforms := []TransformFunc{
-			func(m baggage.Member) baggage.Member {
-				key := strings.ReplaceAll(m.Key(), ".", "_")
-				newM, err := baggage.NewMember(key, m.Value())
-				require.NoError(t, err)
-				return newM
-			},
-		}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, *labelSet)
-
-		expectedLabels := map[string]string{
-			"k6_test_run_id":        "123",
-			"not_k6_some_other_key": "value",
-		}
-		require.Equal(t, expectedLabels, gotLabels)
-	})
-
-	t.Run("with filters and transforms", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://example.com", nil)
-		req = testRequestWithBaggage(t, req, map[string]string{
-			"k6.test_run_id":        "123",
-			"not_k6.some_other_key": "value",
-		})
-
-		filters := []FilterFunc{
-			func(m baggage.Member) bool {
-				return strings.HasPrefix(m.Key(), "k6.")
-			},
-		}
-		transforms := []TransformFunc{
-			func(m baggage.Member) baggage.Member {
-				key := strings.ReplaceAll(m.Key(), ".", "_")
-				newM, err := baggage.NewMember(key, m.Value())
-				require.NoError(t, err)
-				return newM
-			},
-		}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, *labelSet)
-
-		expectedLabels := map[string]string{
-			"k6_test_run_id": "123",
-		}
 		require.Equal(t, expectedLabels, gotLabels)
 	})
 
@@ -136,14 +32,7 @@ func Test_getBaggageLabels(t *testing.T) {
 			"not_k6.some_other_key": "value",
 		})
 
-		cfg := &BaggageConfig{}
-		for _, opt := range K6Options() {
-			opt(cfg)
-		}
-		filters := cfg.filters
-		transforms := cfg.transforms
-
-		labelSet := getBaggageLabels(req, filters, transforms)
+		labelSet := getBaggageLabels(req)
 		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
@@ -156,10 +45,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req.Header.Add("Baggage", "invalid")
 
-		filters := []FilterFunc{}
-		transforms := []TransformFunc{}
-
-		labelSet := getBaggageLabels(req, filters, transforms)
+		labelSet := getBaggageLabels(req)
 		require.Nil(t, labelSet)
 	})
 }
