@@ -1,4 +1,4 @@
-package pyroscope
+package k6
 
 import (
 	"context"

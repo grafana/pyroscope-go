@@ -1,10 +1,11 @@
-package pyroscope
+package k6
 
 import (
 	"context"
 	"net/http"
 	"strings"
 
+	"github.com/grafana/pyroscope-go"
 	"go.opentelemetry.io/otel/baggage"
 )
 
@@ -12,7 +13,7 @@ import (
 type FilterFunc func(key string) bool
 
 // TransformFunc transforms the key.
-type TransformFunc func(key string) string
+type TransformFunc func(baggage string) string
 
 // BaggageConfig contains configuration options for filtering and transforming
 // baggage members.
@@ -75,17 +76,17 @@ type labelHandler struct {
 }
 
 func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	TagWrapper(r.Context(), getBaggageLabels(r, lh.cfg.filters, lh.cfg.transforms), func(ctx context.Context) {
+	pyroscope.TagWrapper(r.Context(), getBaggageLabels(r, lh.cfg.filters, lh.cfg.transforms), func(ctx context.Context) {
 		lh.innerHandler.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // getBaggageLabels applies filters and transformations to request baggage and
 // returns the resulting LabelSet.
-func getBaggageLabels(r *http.Request, filters []FilterFunc, transforms []TransformFunc) LabelSet {
+func getBaggageLabels(r *http.Request, filters []FilterFunc, transforms []TransformFunc) pyroscope.LabelSet {
 	b, err := baggage.Parse(r.Header.Get("Baggage"))
 	if err != nil {
-		return Labels()
+		return pyroscope.Labels()
 	}
 
 	labels := make([]string, 0, b.Len()*2)
@@ -109,5 +110,5 @@ Outer:
 		labels = append(labels, key, m.Value())
 	}
 
-	return Labels(labels...)
+	return pyroscope.Labels(labels...)
 }
