@@ -57,8 +57,8 @@ func Test_getBaggageLabels(t *testing.T) {
 		})
 
 		filters := []FilterFunc{
-			func(key string) bool {
-				return strings.HasPrefix(key, "k6.")
+			func(m baggage.Member) bool {
+				return strings.HasPrefix(m.Key(), "k6.")
 			},
 		}
 		transforms := []TransformFunc{}
@@ -81,8 +81,11 @@ func Test_getBaggageLabels(t *testing.T) {
 
 		filters := []FilterFunc{}
 		transforms := []TransformFunc{
-			func(key string) string {
-				return strings.ReplaceAll(key, ".", "_")
+			func(m baggage.Member) baggage.Member {
+				key := strings.ReplaceAll(m.Key(), ".", "_")
+				newM, err := baggage.NewMember(key, m.Value())
+				require.NoError(t, err)
+				return newM
 			},
 		}
 
@@ -104,13 +107,16 @@ func Test_getBaggageLabels(t *testing.T) {
 		})
 
 		filters := []FilterFunc{
-			func(key string) bool {
-				return strings.HasPrefix(key, "k6.")
+			func(m baggage.Member) bool {
+				return strings.HasPrefix(m.Key(), "k6.")
 			},
 		}
 		transforms := []TransformFunc{
-			func(key string) string {
-				return strings.ReplaceAll(key, ".", "_")
+			func(m baggage.Member) baggage.Member {
+				key := strings.ReplaceAll(m.Key(), ".", "_")
+				newM, err := baggage.NewMember(key, m.Value())
+				require.NoError(t, err)
+				return newM
 			},
 		}
 

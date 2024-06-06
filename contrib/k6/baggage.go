@@ -10,10 +10,10 @@ import (
 )
 
 // FilterFunc returns true if this key should be used.
-type FilterFunc func(key string) bool
+type FilterFunc func(m baggage.Member) bool
 
 // TransformFunc transforms the key.
-type TransformFunc func(baggage string) string
+type TransformFunc func(m baggage.Member) baggage.Member
 
 // BaggageConfig contains configuration options for filtering and transforming
 // baggage members.
@@ -42,11 +42,16 @@ func WithTransforms(transforms ...TransformFunc) BaggageOption {
 // K6Options provides default options to select k6 members from the baggage.
 func K6Options() []BaggageOption {
 	return []BaggageOption{
-		WithFilters(func(key string) bool {
-			return strings.HasPrefix(key, "k6.")
+		WithFilters(func(m baggage.Member) bool {
+			return strings.HasPrefix(m.Key(), "k6.")
 		}),
-		WithTransforms(func(key string) string {
-			return strings.ReplaceAll(key, ".", "_")
+		WithTransforms(func(m baggage.Member) baggage.Member {
+			key := strings.ReplaceAll(m.Key(), ".", "_")
+			newM, err := baggage.NewMember(key, m.Value())
+			if err != nil {
+				return m
+			}
+			return newM
 		}),
 	}
 }
@@ -104,16 +109,15 @@ Outer:
 		}
 
 		for _, filter := range filters {
-			if !filter(m.Key()) {
+			if !filter(m) {
 				continue Outer
 			}
 		}
 
-		key := m.Key()
 		for _, transform := range transforms {
-			key = transform(key)
+			m = transform(m)
 		}
-		labels = append(labels, key, m.Value())
+		labels = append(labels, m.Key(), m.Value())
 	}
 
 	lbls := pyroscope.Labels(labels...)
