@@ -23,7 +23,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		transforms := []TransformFunc{}
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{}
 		require.Equal(t, expectedLabels, gotLabels)
@@ -40,7 +40,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		transforms := []TransformFunc{}
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
 			"k6.test_run_id":        "123",
@@ -64,7 +64,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		transforms := []TransformFunc{}
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
 			"k6.test_run_id": "123",
@@ -87,7 +87,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		}
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
 			"k6_test_run_id":        "123",
@@ -115,7 +115,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		}
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
 			"k6_test_run_id": "123",
@@ -138,12 +138,23 @@ func Test_getBaggageLabels(t *testing.T) {
 		transforms := cfg.transforms
 
 		labelSet := getBaggageLabels(req, filters, transforms)
-		gotLabels := testPprofLabelsToMap(t, labelSet)
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
 
 		expectedLabels := map[string]string{
 			"k6_test_run_id": "123",
 		}
 		require.Equal(t, expectedLabels, gotLabels)
+	})
+
+	t.Run("does not allocate with failure to parse baggage", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		req.Header.Add("Baggage", "invalid")
+
+		filters := []FilterFunc{}
+		transforms := []TransformFunc{}
+
+		labelSet := getBaggageLabels(req, filters, transforms)
+		require.Nil(t, labelSet)
 	})
 }
 

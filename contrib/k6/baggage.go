@@ -76,17 +76,23 @@ type labelHandler struct {
 }
 
 func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	pyroscope.TagWrapper(r.Context(), getBaggageLabels(r, lh.cfg.filters, lh.cfg.transforms), func(ctx context.Context) {
+	labels := getBaggageLabels(r, lh.cfg.filters, lh.cfg.transforms)
+	if labels == nil {
+		lh.innerHandler.ServeHTTP(w, r)
+		return
+	}
+
+	pyroscope.TagWrapper(r.Context(), *labels, func(ctx context.Context) {
 		lh.innerHandler.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // getBaggageLabels applies filters and transformations to request baggage and
 // returns the resulting LabelSet.
-func getBaggageLabels(r *http.Request, filters []FilterFunc, transforms []TransformFunc) pyroscope.LabelSet {
+func getBaggageLabels(r *http.Request, filters []FilterFunc, transforms []TransformFunc) *pyroscope.LabelSet {
 	b, err := baggage.Parse(r.Header.Get("Baggage"))
 	if err != nil {
-		return pyroscope.Labels()
+		return nil
 	}
 
 	labels := make([]string, 0, b.Len()*2)
@@ -110,5 +116,6 @@ Outer:
 		labels = append(labels, key, m.Value())
 	}
 
-	return pyroscope.Labels(labels...)
+	lbls := pyroscope.Labels(labels...)
+	return &lbls
 }
