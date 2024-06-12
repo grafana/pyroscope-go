@@ -7,7 +7,7 @@ require (
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.6
 	github.com/grafana/pyroscope-go/godeltaprof/otlp v0.1.5
 	github.com/stretchr/testify v1.8.4
-	go.opentelemetry.io/proto/otlp v1.2.0
+	go.opentelemetry.io/proto/otlp v1.3.1
 	golang.org/x/tools v0.16.0
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.34.1
