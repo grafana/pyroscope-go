@@ -1,8 +1,8 @@
 package k6
 
 import (
-	"context"
 	"net/http"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/grafana/pyroscope-go"
@@ -30,9 +30,14 @@ func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pyroscope.TagWrapper(r.Context(), *labels, func(ctx context.Context) {
-		lh.innerHandler.ServeHTTP(w, r.WithContext(ctx))
-	})
+	// Inlined version of pryoscope.TagWrapper and pprof.Do to reduce noise in
+	// the stack trace.
+	ctx := r.Context()
+	defer pprof.SetGoroutineLabels(ctx)
+	ctx = pprof.WithLabels(ctx, *labels)
+	pprof.SetGoroutineLabels(ctx)
+
+	lh.innerHandler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 // getBaggageLabels applies filters and transformations to request baggage and
