@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/grafana/pyroscope-go v1.1.1
 	github.com/stretchr/testify v1.9.0
-	go.opentelemetry.io/otel v1.27.0
+	go.opentelemetry.io/otel v1.17.0
 )
 
 require (
