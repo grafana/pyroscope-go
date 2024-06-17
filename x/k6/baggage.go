@@ -51,11 +51,11 @@ func getBaggageLabels(r *http.Request) *pyroscope.LabelSet {
 func baggageToLabels(b baggage.Baggage) pyroscope.LabelSet {
 	labelPairs := make([]string, 0, len(b.Members())*2)
 	for _, m := range b.Members() {
-		if m.Value() == "" {
+		if !strings.HasPrefix(m.Key(), "k6.") {
 			continue
 		}
 
-		if !strings.HasPrefix(m.Key(), "k6.") {
+		if m.Value() == "" {
 			continue
 		}
 
