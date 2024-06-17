@@ -87,10 +87,6 @@ func (b *otlpProtoBuilder) Sample(values []int64, locs []uint64, _ int64) {
 }
 
 func (b *otlpProtoBuilder) Build() {
-	b.res.StringTable = b.strings
-	b.res.LocationIndices = b.locIndex
-	b.res.TimeNanos = b.start.UnixNano()
-	b.res.DurationNanos = time.Since(b.start).Nanoseconds()
 	b.res.Mapping = make([]*otlpprofile.Mapping, 0, len(b.mem))
 	for i, m := range b.mem {
 		hasFunctions := m.Funcs == pprof.LookupTried // LookupTried but not LookupFailed
@@ -105,6 +101,10 @@ func (b *otlpProtoBuilder) Build() {
 			HasFunctions: hasFunctions,
 		})
 	}
+	b.res.StringTable = b.strings
+	b.res.LocationIndices = b.locIndex
+	b.res.TimeNanos = b.start.UnixNano()
+	b.res.DurationNanos = time.Since(b.start).Nanoseconds()
 	return
 }
 
