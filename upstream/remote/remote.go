@@ -21,7 +21,13 @@ import (
 
 var errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
 
-const cloudHostnameSuffix = "pyroscope.cloud"
+const (
+	authTokenDeprecationWarning = "Authtoken is specified, but deprecated and ignored. " +
+		"Please switch to BasicAuthUser and BasicAuthPassword. " +
+		"If you need to use Bearer token authentication for a custom setup, " +
+		"you can use the HTTPHeaders option to set the Authorization header manually."
+	cloudHostnameSuffix = "pyroscope.cloud"
+)
 
 type Remote struct {
 	cfg    Config
@@ -195,10 +201,7 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	} else if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
 	} else if r.cfg.AuthToken != "" {
-		r.logger.Infof("Authtoken is specified, but deprecated and ignored." +
-			"Please switch to BasicAuthUser and BasicAuthPassword. " +
-			"If you need to use Bearer token authentication for a custom setup, " +
-			"you can use the HTTPHeaders option to set the Authorization header manually.")
+		r.logger.Infof(authTokenDeprecationWarning)
 	}
 	if r.cfg.TenantID != "" {
 		request.Header.Set("X-Scope-OrgID", r.cfg.TenantID)
