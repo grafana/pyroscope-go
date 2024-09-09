@@ -1,18 +1,18 @@
 package pyroscope
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/grafana/pyroscope-go/internal/testutil"
 	"github.com/grafana/pyroscope-go/upstream"
 )
 
 func Test_StartCPUProfile_interrupts_background_profiling(t *testing.T) {
-	logger := new(testLogger)
+	logger := testutil.NewTestLogger()
 	collector := new(mockCollector)
 	c := newCPUProfileCollector(
 		"test",
@@ -45,14 +45,14 @@ func Test_StartCPUProfile_interrupts_background_profiling(t *testing.T) {
 
 	c.Stop()
 
-	if !reflect.DeepEqual(logger.lines, []string{
+	if !reflect.DeepEqual(logger.Lines(), []string{
 		"starting cpu profile collector",
 		"cpu profile collector interrupted with StartCPUProfile",
 		"cpu profile collector restored",
 		"stopping cpu profile collector",
 		"stopping cpu profile collector stopped",
 	}) {
-		for _, line := range logger.lines {
+		for _, line := range logger.Lines() {
 			t.Log(line)
 		}
 		t.Fatal("^ unexpected even sequence")
@@ -60,7 +60,7 @@ func Test_StartCPUProfile_interrupts_background_profiling(t *testing.T) {
 }
 
 func Test_StartCPUProfile_blocks_Stop(t *testing.T) {
-	logger := new(testLogger)
+	logger := testutil.NewTestLogger()
 	collector := new(mockCollector)
 	c := newCPUProfileCollector(
 		"test",
@@ -86,14 +86,14 @@ func Test_StartCPUProfile_blocks_Stop(t *testing.T) {
 	go c.StopCPUProfile()
 	c.Stop()
 
-	if !reflect.DeepEqual(logger.lines, []string{
+	if !reflect.DeepEqual(logger.Lines(), []string{
 		"starting cpu profile collector",
 		"cpu profile collector interrupted with StartCPUProfile",
 		"stopping cpu profile collector",
 		"cpu profile collector restored",
 		"stopping cpu profile collector stopped",
 	}) {
-		for _, line := range logger.lines {
+		for _, line := range logger.Lines() {
 			t.Log(line)
 		}
 		t.Fatal("^ unexpected even sequence")
@@ -146,18 +146,3 @@ type mockUpstream struct{ uploaded []*upstream.UploadJob }
 func (m *mockUpstream) Upload(j *upstream.UploadJob) { m.uploaded = append(m.uploaded, j) }
 
 func (*mockUpstream) Flush() {}
-
-type testLogger struct {
-	sync.Mutex
-	lines []string
-}
-
-func (t *testLogger) Debugf(format string, args ...interface{}) { t.put(format, args...) }
-func (t *testLogger) Infof(format string, args ...interface{})  { t.put(format, args...) }
-func (t *testLogger) Errorf(format string, args ...interface{}) { t.put(format, args...) }
-
-func (t *testLogger) put(format string, args ...interface{}) {
-	t.Lock()
-	t.lines = append(t.lines, fmt.Sprintf(format, args...))
-	t.Unlock()
-}
