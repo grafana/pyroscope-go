@@ -40,6 +40,8 @@ type HTTPClient interface {
 }
 
 type Config struct {
+	// Deprecated: AuthToken will be removed in future releases.
+	// Use BasicAuthUser and BasicAuthPassword instead.
 	AuthToken         string
 	BasicAuthUser     string // http basic auth user
 	BasicAuthPassword string // http basic auth password
@@ -90,7 +92,7 @@ func NewRemote(cfg Config) (*Remote, error) {
 	}
 
 	// authorize the token first
-	if cfg.AuthToken == "" && requiresAuthToken(u) {
+	if cfg.AuthToken == "" && isOGPyroscopeCloud(u) {
 		return nil, errCloudTokenRequired
 	}
 
@@ -188,10 +190,12 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	request.Header.Set("Content-Type", contentType)
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
-	if r.cfg.AuthToken != "" {
+	if r.cfg.AuthToken != "" && isOGPyroscopeCloud(u) {
 		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
 	} else if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
+	} else if r.cfg.AuthToken != "" {
+		r.logger.Infof("Deprecated: AuthToken is being used. Please switch to BasicAuthUser and BasicAuthPassword.")
 	}
 	if r.cfg.TenantID != "" {
 		request.Header.Set("X-Scope-OrgID", r.cfg.TenantID)
@@ -234,7 +238,7 @@ func (r *Remote) handleJobs() {
 	}
 }
 
-func requiresAuthToken(u *url.URL) bool {
+func isOGPyroscopeCloud(u *url.URL) bool {
 	return strings.HasSuffix(u.Host, cloudHostnameSuffix)
 }
 
