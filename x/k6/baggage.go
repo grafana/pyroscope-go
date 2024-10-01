@@ -22,27 +22,25 @@ func LabelsFromBaggageHandler(handler http.Handler) http.Handler {
 	return lh
 }
 
-func LabelsFromBaggageUnaryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		var found bool
-		ctx, found = setBaggageContextFromMetadata(ctx)
-		if !found {
-			return handler(ctx, req)
-		}
-
-		labels := getBaggageLabelsFromContext(ctx)
-		if labels == nil {
-			return handler(ctx, req)
-		}
-
-		// Inlined version of pyroscope.TagWrapper and pprof.Do to reduce noise in
-		// the stack trace.
-		defer pprof.SetGoroutineLabels(ctx)
-		ctx = pprof.WithLabels(ctx, *labels)
-		pprof.SetGoroutineLabels(ctx)
-
+func LabelsFromBaggageUnaryInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	var found bool
+	ctx, found = setBaggageContextFromMetadata(ctx)
+	if !found {
 		return handler(ctx, req)
 	}
+
+	labels := getBaggageLabelsFromContext(ctx)
+	if labels == nil {
+		return handler(ctx, req)
+	}
+
+	// Inlined version of pyroscope.TagWrapper and pprof.Do to reduce noise in
+	// the stack trace.
+	defer pprof.SetGoroutineLabels(ctx)
+	ctx = pprof.WithLabels(ctx, *labels)
+	pprof.SetGoroutineLabels(ctx)
+
+	return handler(ctx, req)
 }
 
 type labelHandler struct {
