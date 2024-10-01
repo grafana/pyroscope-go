@@ -1,12 +1,15 @@
 package k6
 
 import (
+	"context"
 	"net/http"
 	"runtime/pprof"
 	"strings"
 
 	"github.com/grafana/pyroscope-go"
 	"go.opentelemetry.io/otel/baggage"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // LabelsFromBaggageHandler is a middleware that will extract key-value pairs
@@ -17,6 +20,29 @@ func LabelsFromBaggageHandler(handler http.Handler) http.Handler {
 	}
 
 	return lh
+}
+
+func LabelsFromBaggageUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		var found bool
+		ctx, found = setBaggageContextFromMetadata(ctx)
+		if !found {
+			return handler(ctx, req)
+		}
+
+		labels := getBaggageLabelsFromContext(ctx)
+		if labels == nil {
+			return handler(ctx, req)
+		}
+
+		// Inlined version of pyroscope.TagWrapper and pprof.Do to reduce noise in
+		// the stack trace.
+		defer pprof.SetGoroutineLabels(ctx)
+		ctx = pprof.WithLabels(ctx, *labels)
+		pprof.SetGoroutineLabels(ctx)
+
+		return handler(ctx, req)
+	}
 }
 
 type labelHandler struct {
@@ -31,7 +57,8 @@ func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	labels := getBaggageLabels(r)
+	ctx := r.Context()
+	labels := getBaggageLabelsFromContext(ctx)
 	if labels == nil {
 		lh.innerHandler.ServeHTTP(w, r)
 		return
@@ -39,7 +66,6 @@ func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Inlined version of pyroscope.TagWrapper and pprof.Do to reduce noise in
 	// the stack trace.
-	ctx := r.Context()
 	defer pprof.SetGoroutineLabels(ctx)
 	ctx = pprof.WithLabels(ctx, *labels)
 	pprof.SetGoroutineLabels(ctx)
@@ -62,10 +88,30 @@ func setBaggageContextFromHeader(r *http.Request) (*http.Request, bool) {
 	return r.WithContext(ctx), true
 }
 
+func setBaggageContextFromMetadata(ctx context.Context) (context.Context, bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ctx, false
+	}
+
+	baggageHeader := md.Get("Baggage")
+	if baggageHeader == nil || len(baggageHeader) == 0 {
+		return ctx, false
+	}
+
+	b, err := baggage.Parse(baggageHeader[0])
+	if err != nil {
+		return ctx, false
+	}
+
+	ctx = baggage.ContextWithBaggage(ctx, b)
+	return ctx, true
+}
+
 // getBaggageLabels applies filters and transformations to request baggage and
 // returns the resulting LabelSet.
-func getBaggageLabels(r *http.Request) *pyroscope.LabelSet {
-	b := baggage.FromContext(r.Context())
+func getBaggageLabelsFromContext(ctx context.Context) *pyroscope.LabelSet {
+	b := baggage.FromContext(ctx)
 	if b.Len() == 0 {
 		return nil
 	}
