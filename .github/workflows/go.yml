@@ -38,6 +38,7 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - run: go clean -modcache
       - name: Build example application
         run: go build example/main.go
       - name: Run tests
