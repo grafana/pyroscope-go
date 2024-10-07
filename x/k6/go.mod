@@ -1,8 +1,6 @@
 module github.com/grafana/pyroscope-go/x/k6
 
-go 1.21
-
-toolchain go1.23.1
+go 1.23.1
 
 require (
 	github.com/grafana/pyroscope-go v1.1.1
