@@ -54,6 +54,7 @@ func main() {
 		TenantID:          os.Getenv("PYROSCOPE_TENANT_ID"),
 		BasicAuthUser:     os.Getenv("PYROSCOPE_BASIC_AUTH_USER"),
 		BasicAuthPassword: os.Getenv("PYROSCOPE_BASIC_AUTH_PASSWORD"),
+		DisableGCRuns:     true,
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileInuseObjects,
