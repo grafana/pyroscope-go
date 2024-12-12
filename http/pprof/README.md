@@ -21,6 +21,8 @@ the `net/http/pprof` package is imported by dependencies, and therefore there is
 reliable way to avoid the conflict.
 
 ```go
+package main
+
 import (
     "net/http"
 
@@ -28,7 +30,7 @@ import (
 )
 
 func main() {
-	http.Handle("/debug/pprof/cpu", pprof.Profile())
+	http.HandleFunc("/debug/pprof/cpu", pprof.Profile)
 }
 ```
 
