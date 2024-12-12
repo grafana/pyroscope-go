@@ -96,7 +96,7 @@ func Test_getBaggageLabels(t *testing.T) {
 			"not_k6.some_other_key", "value",
 		)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.NotNil(t, labelSet)
 
 		gotLabels := testPprofLabelsToMap(t, *labelSet)
@@ -111,14 +111,14 @@ func Test_getBaggageLabels(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req = testAddBaggageToRequest(t, req)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.Nil(t, labelSet)
 	})
 
 	t.Run("skips_missing_baggage_header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.Nil(t, labelSet)
 	})
 
@@ -126,7 +126,7 @@ func Test_getBaggageLabels(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req.Header.Add("Baggage", "invalid")
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.Nil(t, labelSet)
 	})
 }
