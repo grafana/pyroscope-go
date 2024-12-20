@@ -10,10 +10,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/baggage"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestLabelsFromBaggageHandler(t *testing.T) {
-	t.Run("adds_baggage_to_context", func(t *testing.T) {
+	t.Run("adds_k6_labels_from_baggage", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req = testAddBaggageToRequest(t, req,
 			"k6.test_run_id", "123",
@@ -23,11 +25,17 @@ func TestLabelsFromBaggageHandler(t *testing.T) {
 		handler := LabelsFromBaggageHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			b := baggage.FromContext(r.Context())
 			require.NotNil(t, b)
-
 			testAssertEqualMembers(t, b.Members(),
 				"k6.test_run_id", "123",
 				"not_k6.some_other_key", "value",
 			)
+
+			val, ok := pprof.Label(r.Context(), "k6_test_run_id")
+			require.True(t, ok)
+			require.Equal(t, "123", val)
+
+			_, ok = pprof.Label(r.Context(), "not_k6_some_other_key")
+			require.False(t, ok)
 		}))
 
 		handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -42,6 +50,106 @@ func TestLabelsFromBaggageHandler(t *testing.T) {
 		}))
 
 		handler.ServeHTTP(httptest.NewRecorder(), req)
+	})
+
+	t.Run("passthrough_requests_with_no_k6_baggage", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		req = testAddBaggageToRequest(t, req,
+			"not_k6.some_other_key", "value",
+		)
+
+		handler := LabelsFromBaggageHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b := baggage.FromContext(r.Context())
+			require.NotNil(t, b)
+			testAssertEqualMembers(t, b.Members(),
+				"not_k6.some_other_key", "value",
+			)
+
+			_, ok := pprof.Label(r.Context(), "not_k6_some_other_key")
+			require.False(t, ok)
+		}))
+
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	})
+}
+
+func TestLabelsFromBaggageUnaryInterceptor(t *testing.T) {
+	info := &grpc.UnaryServerInfo{
+		FullMethod: "/example.ExampleService/Test",
+	}
+
+	t.Run("adds_k6_labels_from_grpc_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+			require.Equal(t, "test-request", req)
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			testAssertEqualMembers(t, b.Members(),
+				"k6.test_run_id", "123",
+				"not_k6.some_other_key", "value",
+			)
+
+			val, ok := pprof.Label(ctx, "k6_test_run_id")
+			require.True(t, ok)
+			require.Equal(t, "123", val)
+
+			_, ok = pprof.Label(ctx, "not_k6_some_other_key")
+			require.False(t, ok)
+
+			return "test-response", nil
+		}
+
+		res, err := LabelsFromBaggageUnaryInterceptor(testCtx, "test-request", info, handler)
+		require.NoError(t, err)
+		require.Equal(t, "test-response", res)
+	})
+
+	t.Run("passthrough_requests_with_no_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background())
+
+		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+			require.Equal(t, "test-request", req)
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			require.Equal(t, 0, b.Len())
+
+			return "test-response", nil
+		}
+
+		res, err := LabelsFromBaggageUnaryInterceptor(testCtx, "test-request", info, handler)
+		require.NoError(t, err)
+		require.Equal(t, "test-response", res)
+	})
+
+	t.Run("passthrough_requests_with_no_k6_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"not_k6.some_other_key", "value",
+		)
+
+		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+			require.Equal(t, "test-request", req)
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			testAssertEqualMembers(t, b.Members(),
+				"not_k6.some_other_key", "value",
+			)
+
+			_, ok := pprof.Label(ctx, "not_k6_some_other_key")
+			require.False(t, ok)
+
+			return "test-response", nil
+		}
+
+		res, err := LabelsFromBaggageUnaryInterceptor(testCtx, "test-request", info, handler)
+		require.NoError(t, err)
+		require.Equal(t, "test-response", res)
 	})
 }
 
@@ -96,7 +204,7 @@ func Test_getBaggageLabels(t *testing.T) {
 			"not_k6.some_other_key", "value",
 		)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.NotNil(t, labelSet)
 
 		gotLabels := testPprofLabelsToMap(t, *labelSet)
@@ -111,14 +219,14 @@ func Test_getBaggageLabels(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req = testAddBaggageToRequest(t, req)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.Nil(t, labelSet)
 	})
 
 	t.Run("skips_missing_baggage_header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
 		require.Nil(t, labelSet)
 	})
 
@@ -126,7 +234,102 @@ func Test_getBaggageLabels(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://example.com", nil)
 		req.Header.Add("Baggage", "invalid")
 
-		labelSet := getBaggageLabels(req)
+		labelSet := getBaggageLabelsFromContext(req.Context())
+		require.Nil(t, labelSet)
+	})
+}
+
+func Test_baggageToLabels(t *testing.T) {
+	t.Run("with_k6_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t,
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		labelSet := baggageToLabels(b)
+		require.NotNil(t, labelSet)
+
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
+		expectedLabels := map[string]string{
+			"k6_test_run_id": "123",
+		}
+
+		require.Equal(t, expectedLabels, gotLabels)
+	})
+
+	t.Run("with_empty_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t)
+
+		labelSet := baggageToLabels(b)
+		require.Nil(t, labelSet)
+	})
+
+	t.Run("with_no_k6_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t,
+			"not_k6.some_other_key", "value",
+		)
+
+		labelSet := baggageToLabels(b)
+		require.Nil(t, labelSet)
+	})
+}
+func Test_setBaggageContextFromMetadata(t *testing.T) {
+	t.Run("sets_baggage_context", func(t *testing.T) {
+		ctx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		ctx, found := setBaggageContextFromMetadata(ctx)
+		require.True(t, found)
+
+		b := baggage.FromContext(ctx)
+		testAssertEqualMembers(t, b.Members(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+	})
+
+	t.Run("does_not_set_baggage_context_with_no_baggage", func(t *testing.T) {
+		ctx := context.Background()
+
+		ctx, found := setBaggageContextFromMetadata(ctx)
+		require.False(t, found)
+
+		b := baggage.FromContext(ctx)
+		require.Equal(t, 0, b.Len())
+	})
+}
+
+func Test_getBaggageLabelsFromContext(t *testing.T) {
+	t.Run("with_k6_baggage", func(t *testing.T) {
+		ctx := testAddBaggageToRequest(t, httptest.NewRequest("GET", "http://example.com", nil),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
+		require.NotNil(t, labelSet)
+
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
+		expectedLabels := map[string]string{
+			"k6_test_run_id": "123",
+		}
+
+		require.Equal(t, expectedLabels, gotLabels)
+	})
+
+	t.Run("empty_values_are_skipped", func(t *testing.T) {
+		ctx := testAddBaggageToRequest(t, httptest.NewRequest("GET", "http://example.com", nil)).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
+		require.Nil(t, labelSet)
+	})
+
+	t.Run("skips_missing_baggage_header", func(t *testing.T) {
+		ctx := httptest.NewRequest("GET", "http://example.com", nil).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
 		require.Nil(t, labelSet)
 	})
 }
@@ -155,6 +358,45 @@ func testAddBaggageToRequest(t *testing.T, req *http.Request, kvPairs ...string)
 	req.Header.Add("Baggage", b.String())
 
 	return req
+}
+
+func testAddBaggageToGRPCRequest(t *testing.T, ctx context.Context, kvPairs ...string) context.Context {
+	t.Helper()
+
+	require.Equal(t, 0, len(kvPairs)%2, "kvPairs must be a multiple of 2")
+
+	members := make([]baggage.Member, 0, len(kvPairs)/2)
+	for i := 0; i < len(kvPairs); i += 2 {
+		key := kvPairs[i]
+		value := kvPairs[i+1]
+		members = append(members, testMustNewMember(t, key, value))
+	}
+
+	b, err := baggage.New(members...)
+	require.NoError(t, err)
+
+	ctx = baggage.ContextWithBaggage(ctx, b)
+	return metadata.NewIncomingContext(ctx, metadata.New(map[string]string{
+		"Baggage": b.String(),
+	}))
+}
+
+func testMustNewBaggage(t *testing.T, kvPairs ...string) baggage.Baggage {
+	t.Helper()
+
+	require.Equal(t, 0, len(kvPairs)%2, "kvPairs must be a multiple of 2")
+
+	members := make([]baggage.Member, 0, len(kvPairs)/2)
+	for i := 0; i < len(kvPairs); i += 2 {
+		key := kvPairs[i]
+		value := kvPairs[i+1]
+		members = append(members, testMustNewMember(t, key, value))
+	}
+
+	b, err := baggage.New(members...)
+	require.NoError(t, err)
+
+	return b
 }
 
 func testMustNewMember(t *testing.T, key string, value string) baggage.Member {

@@ -1,5 +1,5 @@
 GO_VERSION_PRE20 := $(shell go version | awk '{print $$3}' | awk -F '.' '{print ($$1 == "go1" && int($$2) < 20)}')
-TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/... ./x/k6/...
+TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/...
 
 .PHONY: test
 test:
@@ -14,8 +14,6 @@ go/mod:
 	cd godeltaprof/compat/ && GO111MODULE=on go mod tidy
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
-	cd x/k6/ && GO111MODULE=on go mod download
-	cd x/k6/ && GO111MODULE=on go mod tidy
 
 # https://github.com/grafana/pyroscope-go/issues/129
 .PHONY: gotip/fix

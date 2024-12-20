@@ -15,19 +15,32 @@ jobs:
         go: ['1.18', '1.19', '1.20', '1.21', '1.22', '1.23', 'tip']
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Install Go ${{ matrix.go }}
         if: matrix.go != 'tip'
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
       - name: Run go/mod
         run: make go/mod && git diff --exit-code
+
+      - name: Run k6 go/mod
+        if: contains('1.22 1.23 tip', matrix.go)
+        run: cd x/k6 && make go/mod && git diff --exit-code
+
       - name: Install Go stable
         if: matrix.go == 'tip'
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: 1.x
+
       - name: Install Go tip
         shell: bash
         if: matrix.go == 'tip'
@@ -39,10 +52,20 @@ jobs:
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
           make gotip/fix
+
       - name: Build example application
         run: go build example/main.go
+
       - name: Run tests
         run: |
           which go
           go version
+          make test
+
+      - name: Run k6 tests
+        if: contains('1.22 1.23 tip', matrix.go)
+        run: |
+          which go
+          go version
+          cd x/k6
           make test
