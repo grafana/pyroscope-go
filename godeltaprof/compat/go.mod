@@ -6,7 +6,7 @@ require (
 	github.com/google/pprof v0.0.0-20231127191134-f3a68a39ae15
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.5
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
+	golang.org/x/tools v0.16.0
 )
 
 require (
