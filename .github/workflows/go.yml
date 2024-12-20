@@ -31,7 +31,7 @@ jobs:
       - name: Run go/mod
         run: make go/mod && git diff --exit-code
 
-      - name Run k6 go/mod
+      - name: Run k6 go/mod
         if: contains('1.22 1.23 tip', matrix.go)
         run: make go/mod -f ./x/k6/Makefile && git diff --exit-code
 
