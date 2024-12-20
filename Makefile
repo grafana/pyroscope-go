@@ -1,19 +1,5 @@
 GO_VERSION_PRE20 := $(shell go version | awk '{print $$3}' | awk -F '.' '{print ($$1 == "go1" && int($$2) < 20)}')
-
-# x/k6 has a dependency on google.golang.org/grpc, which is only compatiable
-# with the last two stable versions of Go. This is a check to see if we are
-# building with a version of go that is stable.
-#
-# See: https://github.com/grpc/grpc-go?tab=readme-ov-file#prerequisites
-GO_VERSION_STABLE := $(shell scripts/check_go_stable)
-ifndef GO_VERSION_STABLE
-	$(error "failed to check if go version is stable")
-endif
-
 TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/...
-ifeq ($(GO_VERSION_STABLE), 1)
-	TEST_PACKAGES += ./x/k6/...
-endif
 
 .PHONY: test
 test:
