@@ -131,6 +131,41 @@ func Test_getBaggageLabels(t *testing.T) {
 	})
 }
 
+func Test_baggageToLabels(t *testing.T) {
+	t.Run("with_k6_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t,
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		labelSet := baggageToLabels(b)
+		require.NotNil(t, labelSet)
+
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
+		expectedLabels := map[string]string{
+			"k6_test_run_id": "123",
+		}
+
+		require.Equal(t, expectedLabels, gotLabels)
+	})
+
+	t.Run("with_empty_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t)
+
+		labelSet := baggageToLabels(b)
+		require.Nil(t, labelSet)
+	})
+
+	t.Run("with_no_k6_baggage", func(t *testing.T) {
+		b := testMustNewBaggage(t,
+			"not_k6.some_other_key", "value",
+		)
+
+		labelSet := baggageToLabels(b)
+		require.Nil(t, labelSet)
+	})
+}
+
 func testAddBaggageToRequest(t *testing.T, req *http.Request, kvPairs ...string) *http.Request {
 	t.Helper()
 
@@ -155,6 +190,24 @@ func testAddBaggageToRequest(t *testing.T, req *http.Request, kvPairs ...string)
 	req.Header.Add("Baggage", b.String())
 
 	return req
+}
+
+func testMustNewBaggage(t *testing.T, kvPairs ...string) baggage.Baggage {
+	t.Helper()
+
+	require.Equal(t, 0, len(kvPairs)%2, "kvPairs must be a multiple of 2")
+
+	members := make([]baggage.Member, 0, len(kvPairs)/2)
+	for i := 0; i < len(kvPairs); i += 2 {
+		key := kvPairs[i]
+		value := kvPairs[i+1]
+		members = append(members, testMustNewMember(t, key, value))
+	}
+
+	b, err := baggage.New(members...)
+	require.NoError(t, err)
+
+	return b
 }
 
 func testMustNewMember(t *testing.T, key string, value string) baggage.Member {

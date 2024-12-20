@@ -114,12 +114,11 @@ func getBaggageLabelsFromContext(ctx context.Context) *pyroscope.LabelSet {
 		return nil
 	}
 
-	labels := baggageToLabels(b)
-	return &labels
+	return baggageToLabels(b)
 }
 
 // baggageToLabels converts request baggage to a LabelSet.
-func baggageToLabels(b baggage.Baggage) pyroscope.LabelSet {
+func baggageToLabels(b baggage.Baggage) *pyroscope.LabelSet {
 	labelPairs := make([]string, 0, len(b.Members())*2)
 	for _, m := range b.Members() {
 		if !strings.HasPrefix(m.Key(), "k6.") {
@@ -134,5 +133,10 @@ func baggageToLabels(b baggage.Baggage) pyroscope.LabelSet {
 		labelPairs = append(labelPairs, key, m.Value())
 	}
 
-	return pyroscope.Labels(labelPairs...)
+	if len(labelPairs) == 0 {
+		return nil
+	}
+
+	labels := pyroscope.Labels(labelPairs...)
+	return &labels
 }
