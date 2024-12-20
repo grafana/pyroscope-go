@@ -33,7 +33,7 @@ jobs:
 
       - name: Run k6 go/mod
         if: contains('1.22 1.23 tip', matrix.go)
-        run: make go/mod -f ./x/k6/Makefile && git diff --exit-code
+        run: cd x/k6 && make go/mod && git diff --exit-code
 
       - name: Install Go stable
         if: matrix.go == 'tip'
@@ -67,4 +67,5 @@ jobs:
         run: |
           which go
           go version
-          make test -f ./x/k6/Makefile
+          cd x/k6
+          make test
