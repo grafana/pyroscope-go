@@ -57,3 +57,10 @@ jobs:
           which go
           go version
           make test
+
+      - name: Run k6 tests
+        if: contains('1.22 1.23 tip', matrix.go)
+        run: |
+          which go
+          go version
+          make test -f ./x/k6/Makefile
