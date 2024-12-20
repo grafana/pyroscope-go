@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/grafana/pyroscope-go"
+	"math/rand"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"sync"
-
-	"github.com/grafana/pyroscope-go"
 )
 
 //go:noinline
@@ -49,7 +49,7 @@ func main() {
 	pyroscope.Start(pyroscope.Config{
 		ApplicationName:   "simple.golang.app-new",
 		ServerAddress:     "http://localhost:4040",
-		Logger:            pyroscope.StandardLogger,
+		Logger:            &customLogger{},
 		AuthToken:         os.Getenv("PYROSCOPE_AUTH_TOKEN"),
 		TenantID:          os.Getenv("PYROSCOPE_TENANT_ID"),
 		BasicAuthUser:     os.Getenv("PYROSCOPE_BASIC_AUTH_USER"),
@@ -78,4 +78,32 @@ func main() {
 			wg.Wait()
 		}
 	})
+}
+
+type customLogger struct {
+}
+
+func timeToLog() bool {
+	return rand.Intn(2) == 0 // feeling lucky
+}
+
+func (c *customLogger) Infof(sfmt string, args ...interface {
+}) {
+	if timeToLog() {
+		fmt.Printf("info "+sfmt+"\n", args...)
+	}
+}
+
+func (c *customLogger) Debugf(sfmt string, args ...interface {
+}) {
+	if timeToLog() {
+		fmt.Printf("info "+sfmt+"\n", args...)
+	}
+}
+
+func (c *customLogger) Errorf(sfmt string, args ...interface {
+}) {
+	if timeToLog() {
+		fmt.Printf("error "+sfmt+"\n", args...)
+	}
 }
