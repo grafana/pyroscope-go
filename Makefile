@@ -14,8 +14,6 @@ go/mod:
 	cd godeltaprof/compat/ && GO111MODULE=on go mod tidy
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
-	cd x/k6/ && GO111MODULE=on go mod download
-	cd x/k6/ && GO111MODULE=on go mod tidy
 
 # https://github.com/grafana/pyroscope-go/issues/129
 .PHONY: gotip/fix
