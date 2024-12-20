@@ -273,6 +273,66 @@ func Test_baggageToLabels(t *testing.T) {
 		require.Nil(t, labelSet)
 	})
 }
+func Test_setBaggageContextFromMetadata(t *testing.T) {
+	t.Run("sets_baggage_context", func(t *testing.T) {
+		ctx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		ctx, found := setBaggageContextFromMetadata(ctx)
+		require.True(t, found)
+
+		b := baggage.FromContext(ctx)
+		testAssertEqualMembers(t, b.Members(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+	})
+
+	t.Run("does_not_set_baggage_context_with_no_baggage", func(t *testing.T) {
+		ctx := context.Background()
+
+		ctx, found := setBaggageContextFromMetadata(ctx)
+		require.False(t, found)
+
+		b := baggage.FromContext(ctx)
+		require.Equal(t, 0, b.Len())
+	})
+}
+
+func Test_getBaggageLabelsFromContext(t *testing.T) {
+	t.Run("with_k6_baggage", func(t *testing.T) {
+		ctx := testAddBaggageToRequest(t, httptest.NewRequest("GET", "http://example.com", nil),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
+		require.NotNil(t, labelSet)
+
+		gotLabels := testPprofLabelsToMap(t, *labelSet)
+		expectedLabels := map[string]string{
+			"k6_test_run_id": "123",
+		}
+
+		require.Equal(t, expectedLabels, gotLabels)
+	})
+
+	t.Run("empty_values_are_skipped", func(t *testing.T) {
+		ctx := testAddBaggageToRequest(t, httptest.NewRequest("GET", "http://example.com", nil)).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
+		require.Nil(t, labelSet)
+	})
+
+	t.Run("skips_missing_baggage_header", func(t *testing.T) {
+		ctx := httptest.NewRequest("GET", "http://example.com", nil).Context()
+
+		labelSet := getBaggageLabelsFromContext(ctx)
+		require.Nil(t, labelSet)
+	})
+}
 
 func testAddBaggageToRequest(t *testing.T, req *http.Request, kvPairs ...string) *http.Request {
 	t.Helper()
