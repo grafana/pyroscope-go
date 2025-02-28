@@ -2,6 +2,7 @@ package k6
 
 import (
 	"context"
+	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
 	"net/http"
 	"runtime/pprof"
 	"strings"
@@ -41,6 +42,32 @@ func LabelsFromBaggageUnaryInterceptor(ctx context.Context, req interface{}, _ *
 	pprof.SetGoroutineLabels(ctx)
 
 	return handler(ctx, req)
+}
+
+func LabelsFromBaggageStreamInterceptor(srv interface{}, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	ctx := ss.Context()
+
+	var found bool
+	ctx, found = setBaggageContextFromMetadata(ctx)
+	if !found {
+		return handler(srv, ss)
+	}
+
+	labels := getBaggageLabelsFromContext(ctx)
+	if labels == nil {
+		return handler(srv, ss)
+	}
+
+	// Inlined version of pyroscope.TagWrapper and pprof.Do to reduce noise in
+	// the stack trace.
+	defer pprof.SetGoroutineLabels(ctx)
+	ctx = pprof.WithLabels(ctx, *labels)
+	pprof.SetGoroutineLabels(ctx)
+
+	return handler(srv, &grpcmiddleware.WrappedServerStream{
+		ServerStream:   ss,
+		WrappedContext: ctx,
+	})
 }
 
 type labelHandler struct {
