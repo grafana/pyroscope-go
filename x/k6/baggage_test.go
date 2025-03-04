@@ -2,6 +2,7 @@ package k6
 
 import (
 	"context"
+	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
 	"net/http"
 	"net/http/httptest"
 	"runtime/pprof"
@@ -150,6 +151,83 @@ func TestLabelsFromBaggageUnaryInterceptor(t *testing.T) {
 		res, err := LabelsFromBaggageUnaryInterceptor(testCtx, "test-request", info, handler)
 		require.NoError(t, err)
 		require.Equal(t, "test-response", res)
+	})
+}
+
+func TestLabelsFromBaggageStreamInterceptor(t *testing.T) {
+	info := &grpc.StreamServerInfo{
+		FullMethod: "/example.ExampleService/Test",
+	}
+
+	t.Run("adds_k6_labels_from_grpc_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"k6.test_run_id", "123",
+			"not_k6.some_other_key", "value",
+		)
+
+		handler := func(srv any, stream grpc.ServerStream) error {
+			ctx := stream.Context()
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			testAssertEqualMembers(t, b.Members(),
+				"k6.test_run_id", "123",
+				"not_k6.some_other_key", "value",
+			)
+
+			val, ok := pprof.Label(ctx, "k6_test_run_id")
+			require.True(t, ok)
+			require.Equal(t, "123", val)
+
+			_, ok = pprof.Label(ctx, "not_k6_some_other_key")
+			require.False(t, ok)
+
+			return nil
+		}
+
+		err := LabelsFromBaggageStreamInterceptor(nil, &grpcmiddleware.WrappedServerStream{WrappedContext: testCtx}, info, handler)
+		require.NoError(t, err)
+	})
+
+	t.Run("passthrough_requests_with_no_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background())
+
+		handler := func(srv any, stream grpc.ServerStream) error {
+			ctx := stream.Context()
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			require.Equal(t, 0, b.Len())
+
+			return nil
+		}
+
+		err := LabelsFromBaggageStreamInterceptor(nil, &grpcmiddleware.WrappedServerStream{WrappedContext: testCtx}, info, handler)
+		require.NoError(t, err)
+	})
+
+	t.Run("passthrough_requests_with_no_k6_baggage", func(t *testing.T) {
+		testCtx := testAddBaggageToGRPCRequest(t, context.Background(),
+			"not_k6.some_other_key", "value",
+		)
+
+		handler := func(srv any, stream grpc.ServerStream) error {
+			ctx := stream.Context()
+
+			b := baggage.FromContext(ctx)
+			require.NotNil(t, b)
+			testAssertEqualMembers(t, b.Members(),
+				"not_k6.some_other_key", "value",
+			)
+
+			_, ok := pprof.Label(ctx, "not_k6_some_other_key")
+			require.False(t, ok)
+
+			return nil
+		}
+
+		err := LabelsFromBaggageStreamInterceptor(nil, &grpcmiddleware.WrappedServerStream{WrappedContext: testCtx}, info, handler)
+		require.NoError(t, err)
 	})
 }
 
