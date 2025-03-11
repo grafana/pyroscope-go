@@ -46,7 +46,7 @@ func TestUploadProfile(t *testing.T) {
 				AuthToken: "deprecated-token",
 				Address:   "https://example.com",
 			},
-			expectedAuthHeader: "",
+			expectedAuthHeader: "Bearer deprecated-token",
 			expectWarning:      true,
 		},
 	}
