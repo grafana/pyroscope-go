@@ -2,11 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"github.com/grafana/pyroscope-go/upstream/remote"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"github.com/grafana/pyroscope-go"
 )
@@ -46,7 +53,7 @@ func slowFunction(c context.Context, wg *sync.WaitGroup) {
 func main() {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
-	pyroscope.Start(pyroscope.Config{
+	config := pyroscope.Config{
 		ApplicationName:   "simple.golang.app-new",
 		ServerAddress:     "http://localhost:4040",
 		Logger:            pyroscope.StandardLogger,
@@ -67,7 +74,15 @@ func main() {
 			pyroscope.ProfileBlockDuration,
 		},
 		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
-	})
+	}
+	httpClient, err := createHttpClient()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = start(config, httpClient)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {
 		for {
@@ -78,4 +93,72 @@ func main() {
 			wg.Wait()
 		}
 	})
+}
+
+func start(cfg pyroscope.Config, httpClient remote.HTTPClient) error {
+	rc := remote.Config{
+		TenantID:          cfg.TenantID,
+		BasicAuthUser:     cfg.BasicAuthUser,
+		BasicAuthPassword: cfg.BasicAuthPassword,
+		HTTPHeaders:       cfg.HTTPHeaders,
+		Address:           cfg.ServerAddress,
+		Threads:           5, // per each profile type upload
+		Timeout:           30 * time.Second,
+		Logger:            cfg.Logger,
+		HTTPClient:        httpClient,
+	}
+	uploader, err := remote.NewRemote(rc)
+	if err != nil {
+		return err
+	}
+
+	sc := pyroscope.SessionConfig{
+		Upstream:               uploader,
+		Logger:                 cfg.Logger,
+		AppName:                cfg.ApplicationName,
+		Tags:                   cfg.Tags,
+		ProfilingTypes:         cfg.ProfileTypes,
+		DisableGCRuns:          cfg.DisableGCRuns,
+		DisableAutomaticResets: cfg.DisableAutomaticResets,
+		UploadRate:             cfg.UploadRate,
+	}
+
+	s, err := pyroscope.NewSession(sc)
+	if err != nil {
+		return fmt.Errorf("new session: %w", err)
+	}
+	uploader.Start()
+	if err = s.Start(); err != nil {
+		return fmt.Errorf("start session: %w", err)
+	}
+	return nil
+}
+
+func createHttpClient() (remote.HTTPClient, error) {
+	cert, err := ioutil.ReadFile("./certs/ca.crt")
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(cert)
+
+	clientCert := fmt.Sprintf("./certs/client.crt")
+	clientKey := fmt.Sprintf("./certs/client.key")
+	log.Println("Load key pairs - ", clientCert, clientKey)
+	certificate, err := tls.LoadX509KeyPair(clientCert, clientKey)
+	if err != nil {
+		log.Fatalf("could not load certificate: %v", err)
+	}
+
+	client := &http.Client{
+		Timeout: time.Minute * 3,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:      caCertPool,
+				Certificates: []tls.Certificate{certificate},
+			},
+		},
+	}
+
+	return client, nil
 }
