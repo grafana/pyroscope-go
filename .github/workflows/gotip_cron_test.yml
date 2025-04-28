@@ -5,12 +5,17 @@ on:
     - cron: '37 1 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   go:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install Go stable
         uses: actions/setup-go@v5
         with:
