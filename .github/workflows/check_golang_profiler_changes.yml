@@ -5,6 +5,9 @@ on:
     - cron: '20 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check_golang_profiler_changes:
     runs-on: ubuntu-latest
@@ -12,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.20'
