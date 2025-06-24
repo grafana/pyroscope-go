@@ -1,9 +1,10 @@
-GO_VERSION_PRE20 := $(shell go version | awk '{print $$3}' | awk -F '.' '{print ($$1 == "go1" && int($$2) < 20)}')
 TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/...
+GO ?= go
+GOTIP ?= gotip
 
 .PHONY: test
 test:
-	go test -race $(shell go list $(TEST_PACKAGES) | grep -v /example)
+	$(GO) test -race $(shell $(GO) list $(TEST_PACKAGES) | grep -v /example)
 
 .PHONY: go/mod
 go/mod:
@@ -18,6 +19,6 @@ go/mod:
 # https://github.com/grafana/pyroscope-go/issues/129
 .PHONY: gotip/fix
 gotip/fix:
-	cd godeltaprof/compat/ && gotip get -d -v golang.org/x/tools@v0.25.0
+	cd godeltaprof/compat/ && $(GOTIP) get -v golang.org/x/tools@v0.34.0
 	git --no-pager diff
 	! git diff | grep toolchain
