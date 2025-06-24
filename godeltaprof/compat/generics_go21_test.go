@@ -234,7 +234,8 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 		runtime.MemProfileRate = previousRate
 	}()
 	for _, sz := range []int{128, 256} {
-		_ = genericAllocFunc[uint32](sz / 4)
+		it := genericAllocFunc[uint32](sz / 4)
+		escape(it)
 	}
 	for _, sz := range []int{32, 64} {
 		it := genericAllocFunc[uint64](sz / 8)
@@ -352,9 +353,13 @@ func WriteHeapProfile(w io.Writer) error {
 	return dh.Profile(w)
 }
 
+var blackhole []any
+
 // make sure a is on the heap
 // https://go-review.googlesource.com/c/go/+/649035
 // https://go-review.googlesource.com/c/go/+/653856
 func escape(a any) {
-	fmt.Println(a)
+	blackhole = append(blackhole, a)
+	blackhole[0] = nil
+	blackhole = blackhole[:0]
 }
