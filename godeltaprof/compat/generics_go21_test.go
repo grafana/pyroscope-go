@@ -6,7 +6,6 @@ package compat
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/pprof/profile"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -16,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/grafana/pyroscope-go/godeltaprof"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +60,8 @@ func TestGenericsShape(t *testing.T) {
 		runtime.MemProfileRate = prev
 	}()
 
-	_ = genericAllocFunc[int](239)
+	it := genericAllocFunc[int](239)
+	escape(it)
 
 	runtime.GC()
 
@@ -233,10 +234,11 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 		runtime.MemProfileRate = previousRate
 	}()
 	for _, sz := range []int{128, 256} {
-		genericAllocFunc[uint32](sz / 4)
+		_ = genericAllocFunc[uint32](sz / 4)
 	}
 	for _, sz := range []int{32, 64} {
-		genericAllocFunc[uint64](sz / 8)
+		it := genericAllocFunc[uint64](sz / 8)
+		escape(it)
 	}
 
 	runtime.GC()
@@ -348,4 +350,11 @@ func WriteHeapProfile(w io.Writer) error {
 		LazyMappings:   true,
 	})
 	return dh.Profile(w)
+}
+
+// make sure a is on the heap
+// https://go-review.googlesource.com/c/go/+/649035
+// https://go-review.googlesource.com/c/go/+/653856
+func escape(a any) {
+	fmt.Println(a)
 }
