@@ -19,8 +19,6 @@ var gitUserEmail = flag.String("git.user.email", "", "git user email")
 
 const goRepoURL = "https://github.com/golang/go.git"
 
-const myRemote = "origin"
-
 const mprof = "src/runtime/mprof.go"
 const pprof = "src/runtime/pprof"
 const repoDir = "go_repo"
@@ -120,7 +118,7 @@ func updatePR(prBodyFile string, request PullRequest) {
 		shMy.sh(fmt.Sprintf("git config user.email '%s'", *gitUserEmail))
 	}
 	shMy.sh(fmt.Sprintf("git commit -am '%s'", commitMessage))
-	shMy.sh(fmt.Sprintf("git push -f %s %s:%s", myRemote, branchName, request.HeadRefName))
+	shMy.sh(fmt.Sprintf("git push -f %s %s:%s", remote(), branchName, request.HeadRefName))
 
 	shMy.sh(fmt.Sprintf("gh pr edit %d --body-file '%s'", request.Number, prBodyFile))
 
@@ -136,10 +134,15 @@ func createPR(prBodyFile string) {
 		shMy.sh(fmt.Sprintf("git config user.email '%s'", *gitUserEmail))
 	}
 	shMy.sh(fmt.Sprintf("git commit -am '%s'", commitMessage))
-	shMy.sh(fmt.Sprintf("git push %s %s", myRemote, branchName))
+	shMy.sh(fmt.Sprintf("git push %s %s", remote(), branchName))
 
 	shMy.sh(fmt.Sprintf("gh pr create --title '%s' --body-file '%s' --label '%s' ", commitMessage, prBodyFile, label))
 
+}
+
+func remote() string {
+	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
+	return fmt.Sprintf("https://x-access-token:%s@github.com/grafana/pyroscope-go.git", token)
 }
 
 func createCommitMessage() string {
