@@ -2,7 +2,6 @@ package compat
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"math"
 	"runtime"
@@ -61,9 +60,6 @@ func TestScaleMutex(t *testing.T) {
 	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleMutex")
 	require.NotNil(t, my)
 
-	fmt.Println(my.value[0], my.value[1])
-	fmt.Println(expectedCount, expectedTime)
-
 	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), e*float64(expectedCount))
 	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), e*float64(expectedTime))
 }
@@ -108,9 +104,6 @@ func TestScaleBlock(t *testing.T) {
 
 	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleBlock")
 	require.NotNil(t, my)
-
-	fmt.Println(my.value[0], my.value[1])
-	fmt.Println(expectedCount, expectedTime)
 
 	assert.Less(t, math.Abs(float64(my.value[0])-float64(expectedCount)), 0.4*float64(expectedCount))
 	assert.Less(t, math.Abs(float64(my.value[1])-float64(expectedTime)), 0.4*float64(expectedTime))
@@ -166,8 +159,6 @@ func TestScaleHeap(t *testing.T) {
 	my := findStack(t, res, "github.com/grafana/pyroscope-go/godeltaprof/compat.TestScaleHeap;github.com/grafana/pyroscope-go/godeltaprof/compat.appendBuf")
 	require.NotNil(t, my)
 
-	fmt.Println(my.value)
-	fmt.Println(expected)
 	for i := range my.value {
 		assert.Less(t, math.Abs(float64(my.value[i])-float64(expected[i])), 0.1*float64(expected[i]))
 	}

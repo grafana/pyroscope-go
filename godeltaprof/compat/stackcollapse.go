@@ -2,7 +2,6 @@ package compat
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"reflect"
 	"regexp"
@@ -46,7 +45,6 @@ func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 }
 
 func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, values ...int64) {
-	fmt.Printf("expectStackFrames: %s %+v\n", sfPattern, values)
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
 	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)

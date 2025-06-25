@@ -70,13 +70,11 @@ func TestMutexReject(t *testing.T) {
 			p1 := bytes.NewBuffer(nil)
 			err := PrintCountCycleProfile(h.dp, h.opt, p1, scaler, fs)
 			assert.NoError(t, err)
-			p1Size := p1.Len()
 			profile, err := gprofile.Parse(p1)
 			require.NoError(t, err)
 			ls := stackCollapseProfile(t, profile)
 			assert.Len(t, ls, 512)
 			assert.Len(t, profile.Location, 141)
-			t.Log("p1 size", p1Size)
 
 			p2 := bytes.NewBuffer(nil)
 			err = PrintCountCycleProfile(h.dp, h.opt, p2, scaler, fs)
@@ -88,7 +86,6 @@ func TestMutexReject(t *testing.T) {
 			ls = stackCollapseProfile(t, profile)
 			assert.Len(t, ls, 0)
 			assert.Len(t, profile.Location, 0)
-			t.Log("p2 size", p2Size)
 		})
 	}
 }
