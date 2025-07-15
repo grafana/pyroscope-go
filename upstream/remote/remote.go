@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/pyroscope-go/upstream"
@@ -30,15 +31,19 @@ const (
 )
 
 type Remote struct {
+	mu     sync.Mutex
 	cfg    Config
-	jobs   chan *upstream.UploadJob
+	jobs   chan job
 	client HTTPClient
 	logger Logger
 
 	done chan struct{}
 	wg   sync.WaitGroup
 
-	flushWG sync.WaitGroup
+	flushWG *sync.WaitGroup
+	started bool
+
+	droppedJobs atomic.Uint64
 }
 
 type HTTPClient interface {
@@ -69,7 +74,7 @@ type Logger interface {
 func NewRemote(cfg Config) (*Remote, error) {
 	r := &Remote{
 		cfg:  cfg,
-		jobs: make(chan *upstream.UploadJob, 20),
+		jobs: make(chan job, 20),
 		client: &http.Client{
 			Transport: &http.Transport{
 				MaxConnsPerHost: cfg.Threads,
@@ -85,7 +90,8 @@ func NewRemote(cfg Config) (*Remote, error) {
 			Timeout: cfg.Timeout,
 		},
 		logger: cfg.Logger,
-		done:   make(chan struct{}),
+
+		flushWG: new(sync.WaitGroup),
 	}
 	if cfg.HTTPClient != nil {
 		r.client = cfg.HTTPClient
@@ -106,36 +112,73 @@ func NewRemote(cfg Config) (*Remote, error) {
 }
 
 func (r *Remote) Start() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.started {
+		return
+	}
+	done := make(chan struct{})
 	r.wg.Add(r.cfg.Threads)
 	for i := 0; i < r.cfg.Threads; i++ {
-		go r.handleJobs()
+		go r.handleJobs(done)
 	}
+	r.done = done
+	r.started = true
 }
 
 func (r *Remote) Stop() {
-	if r.done != nil {
-		close(r.done)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started {
+		return
 	}
-
-	// wait for uploading goroutines exit
+	close(r.done)
+	r.done = nil
 	r.wg.Wait()
+
+	r.drainJobs()
+	r.started = false
+}
+
+func (r *Remote) drainJobs() {
+	for {
+		select {
+		case x := <-r.jobs:
+			x.flush.Done()
+			r.logger.Errorf("stopped, dropping a profile job")
+			r.droppedJobs.Add(1)
+		default:
+			return
+		}
+	}
 }
 
 func (r *Remote) Upload(j *upstream.UploadJob) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.started {
+		return
+	}
 	r.flushWG.Add(1)
+	ij := job{
+		upload: j,
+		flush:  r.flushWG,
+	}
 	select {
-	case r.jobs <- j:
+	case r.jobs <- ij:
 	default:
-		r.flushWG.Done()
+		ij.flush.Done()
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
+		r.droppedJobs.Add(1)
 	}
 }
 
 func (r *Remote) Flush() {
-	if r.done == nil {
-		return
-	}
-	r.flushWG.Wait()
+	r.mu.Lock()
+	flush := r.flushWG
+	r.flushWG = new(sync.WaitGroup)
+	r.mu.Unlock()
+	flush.Wait()
 }
 
 func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
@@ -174,7 +217,6 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 
 	q := u.Query()
 	q.Set("name", j.Name)
-	// TODO: I think these should be renamed to startTime / endTime
 	q.Set("from", strconv.FormatInt(j.StartTime.UnixNano(), 10))
 	q.Set("until", strconv.FormatInt(j.EndTime.UnixNano(), 10))
 	q.Set("spyName", j.SpyName)
@@ -232,15 +274,21 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 }
 
 // handle the jobs
-func (r *Remote) handleJobs() {
+func (r *Remote) handleJobs(done chan struct{}) {
 	for {
 		select {
-		case <-r.done:
+		case <-done:
 			r.wg.Done()
 			return
-		case job := <-r.jobs:
-			r.safeUpload(job)
-			r.flushWG.Done()
+		case j := <-r.jobs:
+			r.safeUpload(j.upload)
+			j.flush.Done()
+			select {
+			case <-done:
+				r.wg.Done()
+				return
+			default:
+			}
 		}
 	}
 }
@@ -261,4 +309,9 @@ func (r *Remote) safeUpload(job *upstream.UploadJob) {
 	if err := r.uploadProfile(job); err != nil {
 		r.logger.Errorf("upload profile: %v", err)
 	}
+}
+
+type job struct {
+	upload *upstream.UploadJob
+	flush  *sync.WaitGroup
 }
