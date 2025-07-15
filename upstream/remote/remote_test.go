@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -204,7 +205,7 @@ func TestDrainJobs(t *testing.T) {
 	r.Stop()
 	assert.Len(t, r.jobs, 0)
 	r.Flush()
-	require.EqualValues(t, 2, r.droppedJobs.Load())
+	require.EqualValues(t, 2, atomic.LoadUint64(&r.droppedJobs))
 }
 
 func TestStartStopMultipleTimes(t *testing.T) {

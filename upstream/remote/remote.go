@@ -43,7 +43,7 @@ type Remote struct {
 	flushWG *sync.WaitGroup
 	started bool
 
-	droppedJobs atomic.Uint64
+	droppedJobs uint64
 }
 
 type HTTPClient interface {
@@ -146,7 +146,7 @@ func (r *Remote) drainJobs() {
 		case x := <-r.jobs:
 			x.flush.Done()
 			r.logger.Errorf("stopped, dropping a profile job")
-			r.droppedJobs.Add(1)
+			atomic.AddUint64(&r.droppedJobs, 1)
 		default:
 			return
 		}
@@ -169,7 +169,7 @@ func (r *Remote) Upload(j *upstream.UploadJob) {
 	default:
 		ij.flush.Done()
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
-		r.droppedJobs.Add(1)
+		atomic.AddUint64(&r.droppedJobs, 1)
 	}
 }
 
