@@ -103,13 +103,14 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
 	err := args.Error(1)
 	a0 := args.Get(0)
-	if resp, ok := a0.(*http.Response); ok {
-		return resp, err
+	switch typed := a0.(type) {
+	case *http.Response:
+		return typed, err
+	case func() *http.Response:
+		return typed(), err
+	default:
+		return nil, fmt.Errorf("unknown mock arg type arg %+v %w", a0, err)
 	}
-	if resp, ok := a0.(func() *http.Response); ok {
-		return resp(), err
-	}
-	return nil, fmt.Errorf("unknown arg %+v %w", a0, err)
 }
 
 func TestConcurrentUploadFlushRace(t *testing.T) {
