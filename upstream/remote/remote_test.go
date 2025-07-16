@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,84 +152,6 @@ func TestConcurrentUploadFlushRace(t *testing.T) {
 		r.Flush()
 	})
 	wg.Wait()
-}
-
-func TestStartTwice(t *testing.T) {
-	r, err := NewRemote(Config{
-		Threads:    2,
-		Logger:     testutil.NewTestLogger(),
-		HTTPClient: new(MockHTTPClient),
-	})
-	require.NoError(t, err)
-	r.Start()
-	r.Start()
-	r.Stop()
-}
-
-func TestUploadNotStarted(t *testing.T) {
-	c := new(MockHTTPClient)
-	r, err := NewRemote(Config{
-		Threads:    2,
-		Logger:     testutil.NewTestLogger(),
-		HTTPClient: c,
-	})
-	require.NoError(t, err)
-	r.Upload(newJob("j1"))
-	require.Len(t, r.jobs, 0)
-	c.AssertExpectations(t)
-}
-
-func TestDrainJobs(t *testing.T) {
-	const requestDuration = 100 * time.Millisecond
-	c := new(MockHTTPClient)
-	c.On("Do", mock.Anything).Return(func() *http.Response {
-		time.Sleep(requestDuration)
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString("OK")),
-		}
-	}, nil).Once()
-	logger := testutil.NewTestLogger()
-	r, err := NewRemote(Config{
-		Threads:    1,
-		Logger:     logger,
-		HTTPClient: c,
-	})
-	require.NoError(t, err)
-	r.Start()
-	r.Upload(newJob("job1"))
-	r.Upload(newJob("job2"))
-	r.Upload(newJob("job3"))
-	time.Sleep(time.Millisecond)
-	r.Stop()
-	assert.Len(t, r.jobs, 0)
-	r.Flush()
-	require.EqualValues(t, 2, atomic.LoadUint64(&r.droppedJobs))
-}
-
-func TestStartStopMultipleTimes(t *testing.T) {
-	c := new(MockHTTPClient)
-
-	c.On("Do", mock.Anything).Return(func() *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString("OK")),
-		}
-	}, nil).Once()
-	logger := testutil.NewTestLogger()
-	r, err := NewRemote(Config{
-		Threads:    1,
-		Logger:     logger,
-		HTTPClient: c,
-	})
-	require.NoError(t, err)
-	r.Start()
-	r.Stop()
-	r.Start()
-	defer r.Stop()
-	r.Upload(newJob("j1"))
-	time.Sleep(time.Millisecond)
-	c.AssertExpectations(t)
 }
 
 func newJob(name string) *upstream.UploadJob {

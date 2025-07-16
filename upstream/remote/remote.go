@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/grafana/pyroscope-go/upstream"
@@ -41,9 +40,6 @@ type Remote struct {
 	wg   sync.WaitGroup
 
 	flushWG *sync.WaitGroup
-	started bool
-
-	droppedJobs uint64
 }
 
 type HTTPClient interface {
@@ -89,8 +85,8 @@ func NewRemote(cfg Config) (*Remote, error) {
 			},
 			Timeout: cfg.Timeout,
 		},
-		logger: cfg.Logger,
-
+		logger:  cfg.Logger,
+		done:    make(chan struct{}),
 		flushWG: new(sync.WaitGroup),
 	}
 	if cfg.HTTPClient != nil {
@@ -112,53 +108,22 @@ func NewRemote(cfg Config) (*Remote, error) {
 }
 
 func (r *Remote) Start() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.started {
-		return
-	}
-	done := make(chan struct{})
 	r.wg.Add(r.cfg.Threads)
 	for i := 0; i < r.cfg.Threads; i++ {
-		go r.handleJobs(done)
+		go r.handleJobs()
 	}
-	r.done = done
-	r.started = true
 }
 
 func (r *Remote) Stop() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.started {
-		return
+	if r.done != nil {
+		close(r.done)
 	}
-	close(r.done)
-	r.done = nil
 	r.wg.Wait()
-
-	r.drainJobs()
-	r.started = false
-}
-
-func (r *Remote) drainJobs() {
-	for {
-		select {
-		case x := <-r.jobs:
-			x.flush.Done()
-			r.logger.Errorf("stopped, dropping a profile job")
-			atomic.AddUint64(&r.droppedJobs, 1)
-		default:
-			return
-		}
-	}
 }
 
 func (r *Remote) Upload(j *upstream.UploadJob) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if !r.started {
-		return
-	}
 	r.flushWG.Add(1)
 	ij := job{
 		upload: j,
@@ -169,7 +134,6 @@ func (r *Remote) Upload(j *upstream.UploadJob) {
 	default:
 		ij.flush.Done()
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
-		atomic.AddUint64(&r.droppedJobs, 1)
 	}
 }
 
@@ -274,17 +238,17 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 }
 
 // handle the jobs
-func (r *Remote) handleJobs(done chan struct{}) {
+func (r *Remote) handleJobs() {
 	for {
 		select {
-		case <-done:
+		case <-r.done:
 			r.wg.Done()
 			return
 		case j := <-r.jobs:
 			r.safeUpload(j.upload)
 			j.flush.Done()
 			select {
-			case <-done:
+			case <-r.done:
 				r.wg.Done()
 				return
 			default:
