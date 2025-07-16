@@ -118,21 +118,23 @@ func (r *Remote) Stop() {
 	if r.done != nil {
 		close(r.done)
 	}
+
+	// wait for uploading goroutines exit
 	r.wg.Wait()
 }
 
-func (r *Remote) Upload(j *upstream.UploadJob) {
+func (r *Remote) Upload(uj *upstream.UploadJob) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.flushWG.Add(1)
-	ij := job{
-		upload: j,
+	j := job{
+		upload: uj,
 		flush:  r.flushWG,
 	}
 	select {
-	case r.jobs <- ij:
+	case r.jobs <- j:
 	default:
-		ij.flush.Done()
+		j.flush.Done()
 		r.logger.Errorf("remote upload queue is full, dropping a profile job")
 	}
 }
@@ -247,12 +249,6 @@ func (r *Remote) handleJobs() {
 		case j := <-r.jobs:
 			r.safeUpload(j.upload)
 			j.flush.Done()
-			select {
-			case <-r.done:
-				r.wg.Done()
-				return
-			default:
-			}
 		}
 	}
 }
