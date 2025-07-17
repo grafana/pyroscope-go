@@ -314,38 +314,20 @@ func (h *heapTestHelper) mutate(nmutations int, fs []runtime.MemProfileRecord) {
 	}
 }
 
-func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, p []runtime.MemProfileRecord, rate int64) error {
+func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
+	p []runtime.MemProfileRecord, rate int64) error {
 	stc := pprof.HeapProfileConfig(rate)
 	b := pprof.NewProfileBuilder(w, opt, stc)
 
 	return dp.WriteHeapProto(b, p, rate)
 }
 
-func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
+func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
+	scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
 	stc := pprof.MutexProfileConfig()
 	b := pprof.NewProfileBuilder(w, opt, stc)
 
 	return d.PrintCountCycleProfile(b, scaler, records)
-}
-
-func dumpMemProfileRecords() []runtime.MemProfileRecord {
-	var p []runtime.MemProfileRecord
-	n, ok := runtime.MemProfile(nil, true)
-	for {
-		// Allocate room for a slightly bigger profile,
-		// in case a few more entries have been added
-		// since the call to MemProfile.
-		p = make([]runtime.MemProfileRecord, n+50)
-		n, ok = runtime.MemProfile(p, true)
-		if ok {
-			p = p[0:n]
-
-			break
-		}
-		// Profile grew; try again.
-	}
-
-	return p
 }
 
 type noopBuilder struct {

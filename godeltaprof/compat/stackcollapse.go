@@ -21,33 +21,27 @@ type stack struct {
 }
 
 func expectEmptyProfile(t *testing.T, buffer io.Reader) {
+	t.Helper()
 	profile, err := gprofile.Parse(buffer)
 	require.NoError(t, err)
-	ls := stackCollapseProfile(t, profile)
+	ls := stackCollapseProfile(profile)
 	assert.Empty(t, ls)
 }
 
-func printProfile(t *testing.T, p *bytes.Buffer) {
-	profile, err := gprofile.Parse(bytes.NewBuffer(p.Bytes()))
-	require.NoError(t, err)
-	t.Log("==================")
-	for _, sample := range profile.Sample {
-		s := pprofSampleStackToString(sample)
-		t.Logf("%v %v %v\n", s, sample.Value, sample.NumLabel)
-	}
-}
 
 func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
+	t.Helper()
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
-	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
+	line := findStack(stackCollapseProfile(profile), sfPattern)
 	assert.Nilf(t, line, "stack frame %s found", sfPattern)
 }
 
 func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, values ...int64) {
+	t.Helper()
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
-	line := findStack(t, stackCollapseProfile(t, profile), sfPattern)
+	line := findStack(stackCollapseProfile(profile), sfPattern)
 	assert.NotNilf(t, line, "stack frame %s not found", sfPattern)
 	if line != nil {
 		for i := range values {
@@ -57,6 +51,7 @@ func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, val
 }
 
 func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern string, expectedCount int, expectedValues ...int64) {
+	t.Helper()
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
 	cnt := 0
@@ -83,7 +78,7 @@ func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sa
 	return samples
 }
 
-func findStack(t *testing.T, res []stack, re string) *stack {
+func findStack(res []stack, re string) *stack {
 	rr := regexp.MustCompile(re)
 	for i, re := range res {
 		if rr.MatchString(re.line) {
@@ -94,7 +89,7 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 	return nil
 }
 
-func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
+func stackCollapseProfile(p *gprofile.Profile) []stack {
 	var ret []stack
 	for _, s := range p.Sample {
 		funcs, strSample := pprofSampleStackToStrings(s)

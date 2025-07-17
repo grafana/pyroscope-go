@@ -272,13 +272,13 @@ func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
 }
 
 type opAlloc struct {
-	buf [128]byte
+	buf [128]byte //nolint:unused
 }
 
 type opCall struct {
 }
 
-var sink []byte
+var sink []byte //nolint:gochecknoglobals,unused
 
 func storeAlloc() {
 	sink = make([]byte, 16)
