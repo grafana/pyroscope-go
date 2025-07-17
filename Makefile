@@ -35,10 +35,8 @@ install-lint:
 .PHONY: lint
 lint: install-lint
 	$(GOLANGCI_LINT) run
-
-.PHONY: lint-fix
-lint-fix: install-lint
-	$(GOLANGCI_LINT) run --fix
+	cd godeltaprof && $(GOLANGCI_LINT) run
+	cd godeltaprof/compat && $(GOLANGCI_LINT) run
 
 .PHONY: examples
 examples:

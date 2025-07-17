@@ -14,11 +14,6 @@ import (
 	"time"
 )
 
-// lostProfileEvent is the function to which lost profiling
-// events are attributed.
-// (The name shows up in the pprof graphs.)
-func lostProfileEvent() { lostProfileEvent() }
-
 type ProfileBuilderOptions struct {
 	// for go1.21+ if true - use runtime_FrameSymbolName - produces frames with generic types, for example [go.shape.int]
 	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]

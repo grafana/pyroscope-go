@@ -100,26 +100,12 @@ func (b *protobuf) strings(tag int, x []string) {
 	}
 }
 
-func (b *protobuf) stringOpt(tag int, x string) {
-	if x == "" {
-		return
-	}
-	b.string(tag, x)
-}
-
 func (b *protobuf) bool(tag int, x bool) {
 	if x {
 		b.uint64(tag, 1)
 	} else {
 		b.uint64(tag, 0)
 	}
-}
-
-func (b *protobuf) boolOpt(tag int, x bool) {
-	if x == false {
-		return
-	}
-	b.bool(tag, x)
 }
 
 type msgOffset int
