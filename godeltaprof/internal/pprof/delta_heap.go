@@ -17,7 +17,7 @@ type heapAccValue struct {
 
 type DeltaHeapProfiler struct {
 	m profMap[heapPrevValue, heapAccValue]
-	//todo consider adding an option to remove block size label and merge allocations of different size
+	// todo consider adding an option to remove block size label and merge allocations of different size
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
@@ -90,6 +90,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 					}
 					// Found non-runtime. Show any runtime uses above it.
 					stk = stk[i:]
+
 					break
 				}
 			}
@@ -103,6 +104,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		b.Sample(values, locs, blockSize)
 	}
 	b.Build()
+
 	return nil
 }
 

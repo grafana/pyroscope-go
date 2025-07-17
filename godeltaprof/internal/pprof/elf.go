@@ -6,8 +6,8 @@ package pprof
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"os"
 )
 
@@ -102,8 +102,10 @@ func elfBuildID(file string) (string, error) {
 			if _, err := f.ReadAt(buf[:descSize], descOff); err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("%x", buf[:descSize]), nil
+
+			return hex.EncodeToString(buf[:descSize]), nil
 		}
 	}
+
 	return "", errNoBuildID
 }

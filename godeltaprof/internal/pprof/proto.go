@@ -16,8 +16,8 @@ import (
 
 type ProfileBuilderOptions struct {
 	// for go1.21+ if true - use runtime_FrameSymbolName - produces frames with generic types, for example [go.shape.int]
-	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types ommited [...]
-	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types ommited [...]
+	// for go1.21+ if false - use runtime.Frame->Function - produces frames with generic types omitted [...]
+	// pre 1.21 - always use runtime.Frame->Function - produces frames with generic types omitted [...]
 	GenericsFrames bool
 	LazyMapping    bool
 	mem            []memMap
@@ -27,6 +27,7 @@ func (d *ProfileBuilderOptions) mapping() []memMap {
 	if d.mem == nil || !d.LazyMapping {
 		d.mem = readMapping()
 	}
+
 	return d.mem
 }
 
@@ -147,6 +148,7 @@ func (b *profileBuilder) stringIndex(s string) int64 {
 		b.strings = append(b.strings, s)
 		b.stringMap[s] = id
 	}
+
 	return int64(id)
 }
 
@@ -244,6 +246,7 @@ func allFrames(addr uintptr) ([]runtime.Frame, symbolizeFlag) {
 		frame, more = frames.Next()
 		ret = append(ret, frame)
 	}
+
 	return ret, symbolizeResult
 }
 
@@ -288,6 +291,7 @@ func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfi
 	if stc.DefaultSampleType != "" {
 		b.pb.int64Opt(tagProfile_DefaultSampleType, b.stringIndex(stc.DefaultSampleType))
 	}
+
 	return b
 }
 
@@ -350,6 +354,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			if len(b.deck.pcs) > 0 {
 				if added := b.deck.tryAdd(addr, l.firstPCFrames, l.firstPCSymbolizeResult); added {
 					stk = stk[1:]
+
 					continue
 				}
 			}
@@ -368,6 +373,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 			// limit, expandFinalInlineFrame above has already
 			// fixed the truncation, ensuring it is long enough.
 			stk = stk[len(l.pcs):]
+
 			continue
 		}
 
@@ -377,11 +383,13 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 				locs = append(locs, id)
 			}
 			stk = stk[1:]
+
 			continue
 		}
 
 		if added := b.deck.tryAdd(addr, frames, symbolizeResult); added {
 			stk = stk[1:]
+
 			continue
 		}
 		// add failed because this addr is not inlined with the
@@ -403,6 +411,7 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 	if id := b.emitLocation(); id > 0 { // emit remaining location.
 		locs = append(locs, id)
 	}
+
 	return locs
 }
 
@@ -499,6 +508,7 @@ func (d *pcDeck) tryAdd(pc uintptr, frames []runtime.Frame, symbolizeResult symb
 		d.firstPCFrames = len(d.frames)
 		d.firstPCSymbolizeResult = symbolizeResult
 	}
+
 	return true
 }
 
@@ -565,6 +575,7 @@ func (b *profileBuilder) emitLocation() uint64 {
 			m := b.mem[i]
 			m.funcs |= b.deck.symbolizeResult
 			b.mem[i] = m
+
 			break
 		}
 	}
@@ -582,6 +593,7 @@ func (b *profileBuilder) emitLocation() uint64 {
 	}
 
 	b.flush()
+
 	return id
 }
 
@@ -608,6 +620,7 @@ func readMapping() []memMap {
 			fake:    true,
 		}}
 	}
+
 	return mem
 }
 
@@ -643,6 +656,7 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 		var f []byte
 		f, line, _ = bytesCut(line, space)
 		line = bytes.TrimLeft(line, " ")
+
 		return f
 	}
 
@@ -715,6 +729,7 @@ func bytesCut(s, sep []byte) (before, after []byte, found bool) {
 	if i := bytes.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}
+
 	return s, nil, false
 }
 
@@ -726,5 +741,6 @@ func stringsCut(s, sep string) (before, after string, found bool) {
 	if i := strings.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}
+
 	return s, "", false
 }

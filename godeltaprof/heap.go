@@ -72,11 +72,13 @@ func (d *HeapProfiler) Profile(w io.Writer) error {
 		n, ok = runtime.MemProfile(p, true)
 		if ok {
 			p = p[0:n]
+
 			break
 		}
 		// Profile grew; try again.
 	}
 	rate := int64(runtime.MemProfileRate)
 	b := pprof.NewProfileBuilder(w, &d.options, pprof.HeapProfileConfig(rate))
+
 	return d.impl.WriteHeapProto(b, p, rate)
 }

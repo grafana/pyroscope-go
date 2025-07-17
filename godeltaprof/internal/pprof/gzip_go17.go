@@ -15,5 +15,6 @@ type gzipWriter struct {
 
 func newGzipWriter(w io.Writer) gzipWriter {
 	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+
 	return gzipWriter{zw}
 }

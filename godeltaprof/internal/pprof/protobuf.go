@@ -43,6 +43,7 @@ func (b *protobuf) uint64s(tag int, x []uint64) {
 		copy(b.tmp[:], b.data[n2:n3])
 		copy(b.data[n1+(n3-n2):], b.data[n1:n2])
 		copy(b.data[n1:], b.tmp[:n3-n2])
+
 		return
 	}
 	for _, u := range x {
@@ -82,6 +83,7 @@ func (b *protobuf) int64s(tag int, x []int64) {
 		copy(b.tmp[:], b.data[n2:n3])
 		copy(b.data[n1+(n3-n2):], b.data[n1:n2])
 		copy(b.data[n1:], b.tmp[:n3-n2])
+
 		return
 	}
 	for _, u := range x {
@@ -112,6 +114,7 @@ type msgOffset int
 
 func (b *protobuf) startMessage() msgOffset {
 	b.nest++
+
 	return msgOffset(len(b.data))
 }
 

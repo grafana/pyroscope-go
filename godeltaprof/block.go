@@ -106,6 +106,7 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 		n, ok = d.runtimeProfile(p)
 		if ok {
 			p = p[:n]
+
 			break
 		}
 	}
@@ -114,5 +115,6 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 
 	stc := pprof.MutexProfileConfig()
 	b := pprof.NewProfileBuilder(w, &d.options, stc)
+
 	return d.impl.PrintCountCycleProfile(b, d.scaleProfile, p)
 }
