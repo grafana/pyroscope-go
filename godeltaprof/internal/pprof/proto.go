@@ -451,8 +451,9 @@ func (b *profileBuilder) LocsForStack(stk []uintptr) (newLocs []uint64) {
 // have the following properties:
 //
 //	Frame's Func is nil (note: also true for non-Go functions), and
-//	Frame's Entry matches its entry function frame's Entry (note: could also be true for recursive calls and non-Go functions), and
-//	Frame's Name does not match its entry function frame's name (note: inlined functions cannot be directly recursive).
+//	Frame's Entry matches its entry function frame's Entry (note: could also be true for recursive calls and non-Go
+//	functions), and Frame's Name does not match its entry function frame's name (note: inlined functions cannot be
+//	directly recursive).
 //
 // As reading and processing the pcs in a stack trace one by one (from leaf to the root),
 // we use pcDeck to temporarily hold the observed pcs and their expanded frames
@@ -726,7 +727,9 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 // If sep does not appear in s, cut returns s, nil, false.
 //
 // Cut returns slices of the original slice s, not copies.
-func bytesCut(s, sep []byte) (before, after []byte, found bool) { //nolint:nonamedreturns
+//
+//nolint:unparam
+func bytesCut(s, sep []byte) (before, after []byte, found bool) {
 	if i := bytes.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}
@@ -738,7 +741,7 @@ func bytesCut(s, sep []byte) (before, after []byte, found bool) { //nolint:nonam
 // returning the text before and after sep.
 // The found result reports whether sep appears in s.
 // If sep does not appear in s, cut returns s, "", false.
-func stringsCut(s, sep string) (before, after string, found bool) { //nolint:nonamedreturns
+func stringsCut(s, sep string) (before, after string, found bool) {
 	if i := strings.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}

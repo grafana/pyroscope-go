@@ -10,7 +10,8 @@ import (
 )
 
 // BlockProfiler is a stateful profiler for goroutine blocking events and mutex contention in Go programs.
-// Depending on the function used to create the BlockProfiler, it uses either runtime.BlockProfile or runtime.MutexProfile.
+// Depending on the function used to create the BlockProfiler, it uses either runtime.BlockProfile or
+// runtime.MutexProfile.
 // The BlockProfiler provides similar functionality to pprof.Lookup("block").WriteTo and pprof.Lookup("mutex").WriteTo,
 // but with some key differences.
 //
@@ -100,7 +101,8 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 	defer d.mutex.Unlock()
 
 	var p []runtime.BlockProfileRecord
-	n, ok := d.runtimeProfile(nil)
+	var ok bool
+	n, _ := d.runtimeProfile(nil)
 	for {
 		p = make([]runtime.BlockProfileRecord, n+50)
 		n, ok = d.runtimeProfile(p)

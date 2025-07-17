@@ -63,7 +63,8 @@ func (d *HeapProfiler) Profile(w io.Writer) error {
 	// and also try again if we're very unlucky.
 	// The loop should only execute one iteration in the common case.
 	var p []runtime.MemProfileRecord
-	n, ok := runtime.MemProfile(nil, true)
+	var ok bool
+	n, _ := runtime.MemProfile(nil, true)
 	for {
 		// Allocate room for a slightly bigger profile,
 		// in case a few more entries have been added

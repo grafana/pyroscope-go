@@ -22,7 +22,7 @@ func work(n int) {
 	// revive:enable:empty-block
 }
 
-var m sync.Mutex
+var m sync.Mutex //nolint:gochecknoglobals
 
 func fastFunction(wg *sync.WaitGroup) {
 	m.Lock()

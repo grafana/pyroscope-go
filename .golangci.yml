@@ -37,6 +37,8 @@ linters:
     - tagliatelle
     - noinlineerr
     - ireturn
+    - gochecknoinits
+    - nonamedreturns
     - gomoddirectives # TODO can this be re-enabled?
 
   settings:

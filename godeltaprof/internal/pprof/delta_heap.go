@@ -21,6 +21,8 @@ type DeltaHeapProfiler struct {
 }
 
 // WriteHeapProto writes the current heap profile in protobuf format to w.
+//
+//nolint:gocognit
 func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProfileRecord, rate int64) error {
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64

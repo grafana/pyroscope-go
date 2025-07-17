@@ -18,6 +18,8 @@ var (
 
 // elfBuildID returns the GNU build ID of the named ELF binary,
 // without introducing a dependency on debug/elf and its dependencies.
+//
+//nolint:gocognit
 func elfBuildID(file string) (string, error) {
 	buf := make([]byte, 256)
 	f, err := os.Open(file) //nolint:gosec
