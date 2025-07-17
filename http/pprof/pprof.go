@@ -27,6 +27,7 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 	if durationExceedsWriteTimeout(r, float64(sec)) {
 		serveError(w, http.StatusBadRequest, "profile duration exceeds server's WriteTimeout")
+
 		return
 	}
 
@@ -43,6 +44,7 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 func durationExceedsWriteTimeout(r *http.Request, seconds float64) bool {
 	srv, ok := r.Context().Value(http.ServerContextKey).(*http.Server)
+
 	return ok && srv.WriteTimeout != 0 && seconds >= srv.WriteTimeout.Seconds()
 }
 
@@ -60,5 +62,6 @@ func collectCPUProfile(ctx context.Context, w io.Writer) error {
 	}
 	<-ctx.Done()
 	internal.StopCPUProfile()
+
 	return nil
 }

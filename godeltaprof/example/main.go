@@ -18,7 +18,7 @@ func work(n int) {
 	// revive:disable:empty-block this is fine because this is a example app, not real production code
 	for i := 0; i < n; i++ {
 	}
-	fmt.Printf("work\n")
+	fmt.Printf("work\n") //nolint:forbidigo
 	// revive:enable:empty-block
 }
 
@@ -54,9 +54,9 @@ func main() {
 		deltaMutexProfiler := godeltaprof.NewMutexProfiler()
 		for {
 			time.Sleep(10 * time.Second)
-			deltaHeapProfiler.Profile(bytes.NewBuffer(nil))
-			deltaBlockProfiler.Profile(bytes.NewBuffer(nil))
-			deltaMutexProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaHeapProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaBlockProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaMutexProfiler.Profile(bytes.NewBuffer(nil))
 		}
 	}()
 	runtime.SetMutexProfileFraction(5)

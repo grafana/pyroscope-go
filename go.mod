@@ -2,6 +2,7 @@ module github.com/grafana/pyroscope-go
 
 go 1.17
 
+// todo can we remove this replace?
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
 require (

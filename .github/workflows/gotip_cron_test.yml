@@ -31,7 +31,7 @@ jobs:
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
           make gotip/fix
       - name: Build example application
-        run: go build example/main.go
+        run: make examples
       - name: Run tests
         run: |
           which go

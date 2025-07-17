@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - run: make lint
+
   go:
     runs-on: ubuntu-latest
     strategy:
@@ -59,7 +74,7 @@ jobs:
           make gotip/fix
 
       - name: Build example application
-        run: go build example/main.go
+        run: make examples
 
       - name: Run tests
         run: |

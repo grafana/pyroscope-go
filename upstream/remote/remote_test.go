@@ -3,17 +3,19 @@ package remote
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/grafana/pyroscope-go/internal/testutil"
-	"github.com/grafana/pyroscope-go/upstream"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/grafana/pyroscope-go/internal/testutil"
+	"github.com/grafana/pyroscope-go/upstream"
 )
 
 func TestUploadProfile(t *testing.T) {
@@ -60,7 +62,7 @@ func TestUploadProfile(t *testing.T) {
 			mockClient := new(MockHTTPClient)
 
 			mockClient.On("Do", mock.Anything).Return(&http.Response{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(bytes.NewBufferString("OK")),
 			}, nil)
 
@@ -78,7 +80,7 @@ func TestUploadProfile(t *testing.T) {
 				SampleRate: 100,
 				Units:      "samples",
 			})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tt.expectWarning {
 				assert.Contains(t, logger.Lines(), authTokenDeprecationWarning)
@@ -117,7 +119,7 @@ func TestConcurrentUploadFlushRace(t *testing.T) {
 	mockClient := new(MockHTTPClient)
 	mockClient.On("Do", mock.Anything).Return(func() *http.Response {
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(bytes.NewBufferString("OK")),
 		}
 	}, nil)

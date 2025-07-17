@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -16,11 +17,11 @@ func work(n int) {
 	// revive:disable:empty-block this is fine because this is a example app, not real production code
 	for i := 0; i < n; i++ {
 	}
-	fmt.Printf("work\n")
+	fmt.Printf("work\n") //nolint:forbidigo
 	// revive:enable:empty-block
 }
 
-var m sync.Mutex
+var m sync.Mutex //nolint:gochecknoglobals
 
 func fastFunction(c context.Context, wg *sync.WaitGroup) {
 	m.Lock()
@@ -46,7 +47,7 @@ func slowFunction(c context.Context, wg *sync.WaitGroup) {
 func main() {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
-	pyroscope.Start(pyroscope.Config{
+	p, err := pyroscope.Start(pyroscope.Config{
 		ApplicationName:   "simple.golang.app-new",
 		ServerAddress:     "http://localhost:4040",
 		Logger:            pyroscope.StandardLogger,
@@ -68,6 +69,15 @@ func main() {
 		},
 		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		err = p.Stop()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	pyroscope.TagWrapper(context.Background(), pyroscope.Labels("foo", "bar"), func(c context.Context) {
 		for {
