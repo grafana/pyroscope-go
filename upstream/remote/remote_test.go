@@ -2,8 +2,11 @@ package remote
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -98,5 +101,62 @@ type MockHTTPClient struct {
 
 func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
-	return args.Get(0).(*http.Response), args.Error(1)
+	err := args.Error(1)
+	a0 := args.Get(0)
+	switch typed := a0.(type) {
+	case *http.Response:
+		return typed, err
+	case func() *http.Response:
+		return typed(), err
+	default:
+		return nil, fmt.Errorf("unknown mock arg type arg %+v %w", a0, err)
+	}
+}
+
+func TestConcurrentUploadFlushRace(t *testing.T) {
+	mockClient := new(MockHTTPClient)
+	mockClient.On("Do", mock.Anything).Return(func() *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString("OK")),
+		}
+	}, nil)
+	r, err := NewRemote(Config{
+		Threads:    2,
+		Logger:     testutil.NewTestLogger(),
+		HTTPClient: mockClient,
+	})
+	require.NoError(t, err)
+	r.Start()
+	defer r.Stop()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	loop := func(f func()) {
+		timeout := time.After(10 * time.Millisecond)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-timeout:
+					return
+				default:
+					f()
+				}
+			}
+		}()
+	}
+	loop(func() {
+		r.Upload(newJob("job1"))
+	})
+	loop(func() {
+		r.Flush()
+	})
+	wg.Wait()
+}
+
+func newJob(name string) *upstream.UploadJob {
+	return &upstream.UploadJob{
+		Name: name,
+	}
 }
