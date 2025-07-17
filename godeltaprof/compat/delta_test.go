@@ -2,13 +2,15 @@ package compat
 
 import (
 	"fmt"
-	gprofile "github.com/google/pprof/profile"
-	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	gprofile "github.com/google/pprof/profile"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
 var (
@@ -56,6 +58,7 @@ func init() {
 			f := stk[len(stk)-1-i]
 			res = append(res, runtime.FuncForPC(f).Name())
 		}
+
 		return strings.Join(res, ";")
 	}
 	stack0Marker = marker(stack0[:2])
@@ -180,7 +183,7 @@ func BenchmarkHeapDelta(b *testing.B) {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
 				b.Errorf("unexpected random value: %d. "+
-					"The bench should be deterministic for better comparision.", v)
+					"The bench should be deterministic for better comparison.", v)
 			}
 		}
 		_ = h.dp.WriteHeapProto(builder, fs, int64(runtime.MemProfileRate))
@@ -212,14 +215,13 @@ func BenchmarkMutexDelta(b *testing.B) {
 					v := h.rng.Int63()
 					if v != 7817861117094116717 {
 						b.Errorf("unexpected random value: %d. "+
-							"The bench should be deterministic for better comparision.", v)
+							"The bench should be deterministic for better comparison.", v)
 					}
 				}
 				_ = h.dp.PrintCountCycleProfile(builder, scaler, fs)
 				h.mutate(nmutations, fs)
 			}
 		})
-
 	}
 }
 
@@ -270,18 +272,19 @@ func TestHeapDuplicates(t *testing.T) {
 
 	scale := func(c, b int) []int64 {
 		c1, b1 := pprof.ScaleHeapSample(int64(c), int64(b), testMemProfileRate)
+
 		return []int64{c1, b1, 0, 0}
 	}
-	//expectStackFrames(t, p, stack0Marker, scale(239+7, (239+7)*blockSize)...)
+	// expectStackFrames(t, p, stack0Marker, scale(239+7, (239+7)*blockSize)...)
 	//expectStackFrames(t, p, stack1Marker, scale(42, 42*blockSize)...)
 
-	//printProfile(t, p)
+	// printProfile(t, p)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack0Marker), 1, scale(239+7, (239+7)*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack1Marker), 1, scale(42, 42*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(3, 3*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(5, 5*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(11, 11*blockSize)...)
-	assert.Equal(t, 6, len(pp.Sample))
+	assert.Len(t, pp.Sample, 6)
 
 	p = h.dump(
 		h.r(239, 239*blockSize, 239, 239*blockSize, stack0),

@@ -79,6 +79,7 @@ func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sa
 		}
 		samples = append(samples, profile.Sample[i])
 	}
+
 	return samples
 }
 
@@ -89,6 +90,7 @@ func findStack(t *testing.T, res []stack, re string) *stack {
 			return &res[i]
 		}
 	}
+
 	return nil
 }
 
@@ -109,18 +111,19 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 	for _, s := range ret {
 		if len(unique) == 0 {
 			unique = append(unique, s)
+
 			continue
 		}
 		if unique[len(unique)-1].line == s.line {
 			for i := 0; i < len(s.value); i++ {
 				unique[len(unique)-1].value[i] += s.value[i]
 			}
+
 			continue
 		}
 		unique = append(unique, s)
-
 	}
-	//t.Log("============= stackCollapseProfile ================")
+	// t.Log("============= stackCollapseProfile ================")
 	//for _, s := range unique {
 	//	t.Log(s.line, s.value)
 	//}
@@ -131,17 +134,17 @@ func stackCollapseProfile(t testing.TB, p *gprofile.Profile) []stack {
 
 func pprofSampleStackToString(s *gprofile.Sample) string {
 	_, v := pprofSampleStackToStrings(s)
+
 	return v
 }
 
 func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
 	var funcs []string
 	for i := range s.Location {
-
 		loc := s.Location[i]
 		for _, line := range loc.Line {
 			f := line.Function
-			//funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
+			// funcs = append(funcs, fmt.Sprintf("%s:%d", f.Name, line.Line))
 			funcs = append(funcs, f.Name)
 		}
 	}
@@ -151,5 +154,6 @@ func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
 	}
 
 	strSample := strings.Join(funcs, ";")
+
 	return funcs, strSample
 }

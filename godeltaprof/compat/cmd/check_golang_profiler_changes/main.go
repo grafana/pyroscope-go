@@ -44,6 +44,7 @@ func main() {
 	loadCurrentCommits()
 	if known == current {
 		log.Println("no new commits")
+
 		return
 	}
 	writeLastKnownCommits()
@@ -68,7 +69,7 @@ func createOrUpdatePR() {
 		msg += "\n"
 		msg += "```\n"
 	}
-	//git log  1c0035401358c8bfc2ff646b1d950da5fcd6b355..a7c3de705287d56e3bea8a84ed9a56e4102d3f39 -- src/runtime/mprof.go
+	// git log  1c0035401358c8bfc2ff646b1d950da5fcd6b355..a7c3de705287d56e3bea8a84ed9a56e4102d3f39 -- src/runtime/mprof.go
 
 	if current.Pprof != known.Pprof {
 		msg += pprof
@@ -91,6 +92,7 @@ out:
 		for j := range pr.Labels {
 			if pr.Labels[j].Name == label {
 				found = i
+
 				break out
 			}
 		}
@@ -105,14 +107,13 @@ out:
 		log.Printf("found existing PR %+v. updating.", prs[found])
 		updatePR(prBodyFile, prs[found])
 	}
-
 }
 
 func updatePR(prBodyFile string, request PullRequest) {
 	branchName := createBranchName()
 	commitMessage := createCommitMessage()
 
-	shMy.sh(fmt.Sprintf("git checkout -b %s", branchName))
+	shMy.sh("git checkout -b " + branchName)
 	if *gitUserName != "" && *gitUserEmail != "" {
 		shMy.sh(fmt.Sprintf("git config user.name '%s'", *gitUserName))
 		shMy.sh(fmt.Sprintf("git config user.email '%s'", *gitUserEmail))
@@ -121,14 +122,13 @@ func updatePR(prBodyFile string, request PullRequest) {
 	shMy.sh(fmt.Sprintf("git push -f %s %s:%s", remote(), branchName, request.HeadRefName))
 
 	shMy.sh(fmt.Sprintf("gh pr edit %d --body-file '%s'", request.Number, prBodyFile))
-
 }
 
 func createPR(prBodyFile string) {
 	branchName := createBranchName()
 	commitMessage := createCommitMessage()
 
-	shMy.sh(fmt.Sprintf("git checkout -b %s", branchName))
+	shMy.sh("git checkout -b " + branchName)
 	if *gitUserName != "" && *gitUserEmail != "" {
 		shMy.sh(fmt.Sprintf("git config user.name '%s'", *gitUserName))
 		shMy.sh(fmt.Sprintf("git config user.email '%s'", *gitUserEmail))
@@ -137,16 +137,16 @@ func createPR(prBodyFile string) {
 	shMy.sh(fmt.Sprintf("git push %s %s", remote(), branchName))
 
 	shMy.sh(fmt.Sprintf("gh pr create --title '%s' --body-file '%s' --label '%s' ", commitMessage, prBodyFile, label))
-
 }
 
 func remote() string {
 	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
+
 	return fmt.Sprintf("https://x-access-token:%s@github.com/grafana/pyroscope-go.git", token)
 }
 
 func createCommitMessage() string {
-	return fmt.Sprintf("chore(check_golang_profiler_changes): acknowledge new golang profiler changes")
+	return "chore(check_golang_profiler_changes): acknowledge new golang profiler changes"
 }
 
 func createBranchName() string {
@@ -176,6 +176,7 @@ func checkLatestCommit(repoPath string) string {
 	}
 	commit := match[1]
 	log.Println("latest commit ", repoPath, commit)
+
 	return commit
 }
 
@@ -213,6 +214,7 @@ func requireNoError(err error, msg string) {
 func getRepoDir() string {
 	cwd, err := os.Getwd()
 	requireNoError(err, "cwd")
+
 	return path.Join(cwd, repoDir)
 }
 
@@ -220,8 +222,9 @@ func createTempFile(body string) string {
 	prBodyFile, err := os.CreateTemp("", "check_golang_profiler_changes")
 	requireNoError(err, "create temp file")
 	prBodyFilePath := prBodyFile.Name()
-	prBodyFile.Write([]byte(body))
+	prBodyFile.WriteString(body)
 	prBodyFile.Close()
+
 	return prBodyFilePath
 }
 
@@ -244,6 +247,7 @@ func getPullRequests() []PullRequest {
 	err := json.Unmarshal([]byte(stdout), &prs)
 	requireNoError(err, "unmarshal prs")
 	log.Println("prs", prs)
+
 	return prs
 }
 
@@ -267,5 +271,6 @@ func (s *sh) cmd(cmdArgs ...string) (string, string) {
 	fmt.Println(stdout.String())
 	fmt.Println(stderr.String())
 	requireNoError(err, strings.Join(cmdArgs, " "))
+
 	return stdout.String(), stderr.String()
 }

@@ -16,8 +16,9 @@ import (
 	"time"
 
 	"github.com/google/pprof/profile"
-	"github.com/grafana/pyroscope-go/godeltaprof"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/pyroscope-go/godeltaprof"
 )
 
 func genericAllocFunc[T any](n int) []T {
@@ -206,6 +207,7 @@ func profileToStrings(p *profile.Profile) []string {
 	for _, s := range p.Sample {
 		res = append(res, sampleToString(s))
 	}
+
 	return res
 }
 
@@ -215,6 +217,7 @@ func sampleToString(s *profile.Sample) string {
 		loc := s.Location[i]
 		funcs = locationToStrings(loc, funcs)
 	}
+
 	return fmt.Sprintf("%s %v", strings.Join(funcs, ";"), s.Value)
 }
 
@@ -223,6 +226,7 @@ func locationToStrings(loc *profile.Location, funcs []string) []string {
 		line := loc.Line[len(loc.Line)-1-j]
 		funcs = append(funcs, line.Function.Name)
 	}
+
 	return funcs
 }
 
@@ -321,6 +325,7 @@ func TestGenericsInlineLocations(t *testing.T) {
 	for _, sample := range p.Sample {
 		if sampleToString(sample) == expectedSample {
 			s = sample
+
 			break
 		}
 	}
@@ -337,10 +342,12 @@ func TestGenericsInlineLocations(t *testing.T) {
 func OptimizationOff() bool {
 	optimizationMarker := func() uintptr {
 		pc, _, _, _ := runtime.Caller(0)
+
 		return pc
 	}
 	pc := optimizationMarker()
 	f := runtime.FuncForPC(runtime.FuncForPC(pc).Entry())
+
 	return f.Name() == "github.com/grafana/pyroscope-go/godeltaprof/compat.OptimizationOff.func1"
 }
 
@@ -350,6 +357,7 @@ func WriteHeapProfile(w io.Writer) error {
 		GenericsFrames: true,
 		LazyMappings:   true,
 	})
+
 	return dh.Profile(w)
 }
 

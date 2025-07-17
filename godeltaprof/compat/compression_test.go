@@ -18,7 +18,7 @@ func BenchmarkHeapCompression(b *testing.B) {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
 				b.Errorf("unexpected random value: %d. "+
-					"The bench should be deterministic for better comparision.", v)
+					"The bench should be deterministic for better comparison.", v)
 			}
 		}
 		_ = WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
@@ -49,13 +49,12 @@ func BenchmarkMutexCompression(b *testing.B) {
 					v := h.rng.Int63()
 					if v != 7817861117094116717 {
 						b.Errorf("unexpected random value: %d. "+
-							"The bench should be deterministic for better comparision.", v)
+							"The bench should be deterministic for better comparison.", v)
 					}
 				}
 				_ = PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
 				h.mutate(nmutations, fs)
 			}
 		})
-
 	}
 }

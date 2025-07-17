@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	gprofile "github.com/google/pprof/profile"
-	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
 func TestHeapReject(t *testing.T) {
@@ -34,8 +35,8 @@ func TestHeapReject(t *testing.T) {
 	profile, err = gprofile.Parse(p2)
 	require.NoError(t, err)
 	ls = stackCollapseProfile(t, profile)
-	assert.Len(t, ls, 0)
-	assert.Len(t, profile.Location, 0)
+	assert.Empty(t, ls)
+	assert.Empty(t, profile.Location)
 	t.Log("p2 size", p2Size)
 }
 
@@ -84,8 +85,8 @@ func TestMutexReject(t *testing.T) {
 			profile, err = gprofile.Parse(p2)
 			require.NoError(t, err)
 			ls = stackCollapseProfile(t, profile)
-			assert.Len(t, ls, 0)
-			assert.Len(t, profile.Location, 0)
+			assert.Empty(t, ls)
+			assert.Empty(t, profile.Location)
 		})
 	}
 }
@@ -109,6 +110,5 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 				PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
 			}
 		})
-
 	}
 }

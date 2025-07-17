@@ -2,12 +2,14 @@ package compat
 
 import (
 	"bytes"
-	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"math/rand"
 	"reflect"
 	"runtime"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
 func getFunctionPointers() []uintptr {
@@ -174,6 +176,7 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemPr
 		}
 		records = append(records, r)
 	}
+
 	return records
 }
 
@@ -191,6 +194,7 @@ func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []runtime.Bl
 		}
 		records = append(records, r)
 	}
+
 	return records
 }
 
@@ -211,19 +215,21 @@ func newMutexTestHelper() *mutexTestHelper {
 		scaler: pprof.ScalerMutexProfile,
 		rng:    rand.NewSource(239),
 	}
-	return res
 
+	return res
 }
 
 func (h *mutexTestHelper) scale(rcount, rcycles int64) (int64, int64) {
 	cpuGHz := float64(pprof.Runtime_cyclesPerSecond()) / 1e9
 	count, nanosec := pprof.ScaleMutexProfile(h.scaler, rcount, float64(rcycles)/cpuGHz)
 	inanosec := int64(nanosec)
+
 	return count, inanosec
 }
 
 func (h *mutexTestHelper) scale2(rcount, rcycles int64) []int64 {
 	c, n := h.scale(rcount, rcycles)
+
 	return []int64{c, n}
 }
 
@@ -233,6 +239,7 @@ func (h *mutexTestHelper) dump(r ...runtime.BlockProfileRecord) *bytes.Buffer {
 	if err != nil { // never happens
 		panic(err)
 	}
+
 	return buf
 }
 
@@ -272,6 +279,7 @@ func newHeapTestHelper() *heapTestHelper {
 		rng:  rand.NewSource(239),
 		rate: int64(runtime.MemProfileRate),
 	}
+
 	return res
 }
 
@@ -281,6 +289,7 @@ func (h *heapTestHelper) dump(r ...runtime.MemProfileRecord) *bytes.Buffer {
 	if err != nil { // never happens
 		panic(err)
 	}
+
 	return buf
 }
 
@@ -308,12 +317,14 @@ func (h *heapTestHelper) mutate(nmutations int, fs []runtime.MemProfileRecord) {
 func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, p []runtime.MemProfileRecord, rate int64) error {
 	stc := pprof.HeapProfileConfig(rate)
 	b := pprof.NewProfileBuilder(w, opt, stc)
+
 	return dp.WriteHeapProto(b, p, rate)
 }
 
 func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer, scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
 	stc := pprof.MutexProfileConfig()
 	b := pprof.NewProfileBuilder(w, opt, stc)
+
 	return d.PrintCountCycleProfile(b, scaler, records)
 }
 
@@ -328,10 +339,12 @@ func dumpMemProfileRecords() []runtime.MemProfileRecord {
 		n, ok = runtime.MemProfile(p, true)
 		if ok {
 			p = p[0:n]
+
 			break
 		}
 		// Profile grew; try again.
 	}
+
 	return p
 }
 
