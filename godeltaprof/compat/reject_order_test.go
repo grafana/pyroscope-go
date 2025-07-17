@@ -45,11 +45,14 @@ func BenchmarkHeapRejectOrder(b *testing.B) {
 	fs := h.generateMemProfileRecords(512, 32)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
+		err := WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
-var mutexProfileScalers = []pprof.MutexProfileScaler{
+var mutexProfileScalers = []pprof.MutexProfileScaler{ //nolint:gochecknoglobals
 	pprof.ScalerMutexProfile,
 	pprof.ScalerBlockProfile,
 }
@@ -107,7 +110,10 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
+				err := PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}

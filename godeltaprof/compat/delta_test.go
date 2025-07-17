@@ -277,10 +277,7 @@ func TestHeapDuplicates(t *testing.T) {
 
 		return []int64{c1, b1, 0, 0}
 	}
-	// expectStackFrames(t, p, stack0Marker, scale(239+7, (239+7)*blockSize)...)
-	//expectStackFrames(t, p, stack1Marker, scale(42, 42*blockSize)...)
 
-	// printProfile(t, p)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack0Marker), 1, scale(239+7, (239+7)*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack1Marker), 1, scale(42, 42*blockSize)...)
 	expectPPROFLocations(t, p, fmt.Sprintf("^%s$", stack2Marker), 1, scale(3, 3*blockSize)...)

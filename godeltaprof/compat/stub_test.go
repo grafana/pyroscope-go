@@ -26,7 +26,8 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 		f := p.Types.Scope().Lookup(name)
 		if f != nil {
 			found = true
-			ff := f.(*types.Func)
+			ff, ok := f.(*types.Func)
+			require.True(t, ok)
 			assert.Equal(t, expectedSignature, ff.String())
 		}
 	}
