@@ -19,14 +19,14 @@ func (b *protobuf) varint(x uint64) {
 	b.data = append(b.data, byte(x))
 }
 
-func (b *protobuf) length(tag int, len int) {
-	b.varint(uint64(tag)<<3 | 2)
-	b.varint(uint64(len))
+func (b *protobuf) length(tag int, l int) {
+	b.varint(uint64(tag)<<3 | 2) //nolint:gosec
+	b.varint(uint64(l))          //nolint:gosec
 }
 
 func (b *protobuf) uint64(tag int, x uint64) {
 	// append varint to b.data
-	b.varint(uint64(tag)<<3 | 0)
+	b.varint(uint64(tag) << 3) //nolint:gosec
 	b.varint(x)
 }
 
@@ -59,7 +59,7 @@ func (b *protobuf) uint64Opt(tag int, x uint64) {
 }
 
 func (b *protobuf) int64(tag int, x int64) {
-	u := uint64(x)
+	u := uint64(x) //nolint:gosec
 	b.uint64(tag, u)
 }
 
@@ -75,7 +75,7 @@ func (b *protobuf) int64s(tag int, x []int64) {
 		// Use packed encoding
 		n1 := len(b.data)
 		for _, u := range x {
-			b.varint(uint64(u))
+			b.varint(uint64(u)) //nolint:gosec
 		}
 		n2 := len(b.data)
 		b.length(tag, n2-n1)

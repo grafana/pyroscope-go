@@ -155,7 +155,7 @@ func (b *profileBuilder) stringIndex(s string) int64 {
 func (b *profileBuilder) flush() {
 	const dataFlush = 4096
 	if b.pb.nest == 0 && len(b.pb.data) > dataFlush {
-		b.zw.Write(b.pb.data)
+		_, _ = b.zw.Write(b.pb.data)
 		b.pb.data = b.pb.data[:0]
 	}
 }
@@ -309,16 +309,16 @@ func (b *profileBuilder) Build() {
 	}
 
 	for i, m := range b.mem {
-		hasFunctions := m.funcs == lookupTried // lookupTried but not lookupFailed
-		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.start), uint64(m.end), m.offset, m.file, m.buildID, hasFunctions)
+		hasFunctions := m.funcs == lookupTried                                                                                  //nolint:lll    // lookupTried but not lookupFailed
+		b.pbMapping(tagProfile_Mapping, uint64(i+1), uint64(m.start), uint64(m.end), m.offset, m.file, m.buildID, hasFunctions) //nolint:lll,gosec
 	}
 
 	// TODO: Anything for tagProfile_DropFrames?
 	// TODO: Anything for tagProfile_KeepFrames?
 
 	b.pb.strings(tagProfile_StringTable, b.strings)
-	b.zw.Write(b.pb.data)
-	b.zw.Close()
+	_, _ = b.zw.Write(b.pb.data)
+	_ = b.zw.Close()
 }
 
 // LocsForStack appends the location IDs for the given stack trace to the given
@@ -546,13 +546,14 @@ func (b *profileBuilder) emitLocation() uint64 {
 	start := b.pb.startMessage()
 	b.pb.uint64Opt(tagLocation_ID, id)
 	b.pb.uint64Opt(tagLocation_Address, uint64(firstFrame.PC))
-	for _, frame := range b.deck.frames {
+	for k := range b.deck.frames {
+		frame := &b.deck.frames[k]
 		// Write out each line in frame expansion.
-		funcName := runtime_FrameSymbolName(&frame)
-		funcID := uint64(b.funcs[funcName])
+		funcName := runtime_FrameSymbolName(frame)
+		funcID := uint64(b.funcs[funcName]) //nolint:gosec
 		if funcID == 0 {
 			funcID = uint64(len(b.funcs)) + 1
-			b.funcs[funcName] = int(funcID)
+			b.funcs[funcName] = int(funcID) //nolint:gosec
 			var name string
 			if b.opt.GenericsFrames {
 				name = funcName
@@ -563,14 +564,14 @@ func (b *profileBuilder) emitLocation() uint64 {
 				id:        funcID,
 				name:      name,
 				file:      frame.File,
-				startLine: int64(runtime_FrameStartLine(&frame)),
+				startLine: int64(runtime_FrameStartLine(frame)),
 			})
 		}
 		b.pbLine(tagLocation_Line, funcID, int64(frame.Line))
 	}
 	for i := range b.mem {
 		if b.mem[i].start <= addr && addr < b.mem[i].end || b.mem[i].fake {
-			b.pb.uint64Opt(tagLocation_MappingID, uint64(i+1))
+			b.pb.uint64Opt(tagLocation_MappingID, uint64(i+1)) //nolint:gosec
 
 			m := b.mem[i]
 			m.funcs |= b.deck.symbolizeResult
@@ -624,8 +625,8 @@ func readMapping() []memMap {
 	return mem
 }
 
-var space = []byte(" ")
-var newline = []byte("\n")
+var space = []byte(" ")    //nolint:gochecknoglobals
+var newline = []byte("\n") //nolint:gochecknoglobals
 
 func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file, buildID string)) {
 	// $ cat /proc/self/maps
@@ -725,7 +726,7 @@ func parseProcSelfMaps(data []byte, addMapping func(lo, hi, offset uint64, file,
 // If sep does not appear in s, cut returns s, nil, false.
 //
 // Cut returns slices of the original slice s, not copies.
-func bytesCut(s, sep []byte) (before, after []byte, found bool) {
+func bytesCut(s, sep []byte) (before, after []byte, found bool) { //nolint:nonamedreturns
 	if i := bytes.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}
@@ -737,7 +738,7 @@ func bytesCut(s, sep []byte) (before, after []byte, found bool) {
 // returning the text before and after sep.
 // The found result reports whether sep appears in s.
 // If sep does not appear in s, cut returns s, "", false.
-func stringsCut(s, sep string) (before, after string, found bool) {
+func stringsCut(s, sep string) (before, after string, found bool) { //nolint:nonamedreturns
 	if i := strings.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
 	}

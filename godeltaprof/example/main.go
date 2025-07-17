@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec
 	"runtime"
 	"sync"
 	"time"
@@ -43,7 +43,7 @@ func slowFunction(wg *sync.WaitGroup) {
 
 func main() {
 	go func() {
-		err := http.ListenAndServe("localhost:6060", http.DefaultServeMux)
+		err := http.ListenAndServe("localhost:6060", http.DefaultServeMux) //nolint:gosec
 		if err != nil {
 			panic(err)
 		}
