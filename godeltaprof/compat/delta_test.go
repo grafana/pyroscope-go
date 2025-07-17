@@ -127,9 +127,9 @@ func TestDeltaHeap(t *testing.T) {
 
 func TestDeltaBlockProfile(t *testing.T) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		t.Run(name, func(t *testing.T) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
@@ -195,9 +195,9 @@ func BenchmarkHeapDelta(b *testing.B) {
 
 func BenchmarkMutexDelta(b *testing.B) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		b.Run(name, func(b *testing.B) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)

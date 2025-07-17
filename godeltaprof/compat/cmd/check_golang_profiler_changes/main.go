@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals,err113
 package main
 
 import (
@@ -54,7 +55,8 @@ func main() {
 func createOrUpdatePR() {
 	msg := ""
 	const commitUrl = "https://github.com/golang/go/commit/"
-	msg += "This PR is created by godeltaprof/compat/cmd/check_golang_profiler_changes/main.go to notify src/runtime/mprof.go or src/runtime/pprof in golang are updated.\n"
+	msg += "This PR is created by godeltaprof/compat/cmd/check_golang_profiler_changes/main.go to notify " +
+		"src/runtime/mprof.go or src/runtime/pprof in golang are updated.\n"
 	msg += "Please take look at the golang commits and update godeltaprof accordingly if needed.\n"
 	msg += "Merge the PR to acknowledge golang runtime changes and state no further actions needed for godeltaprof.\n\n"
 
@@ -156,7 +158,7 @@ func createBranchName() string {
 func writeLastKnownCommits() {
 	bs, err := json.MarshalIndent(&current, "", "  ")
 	requireNoError(err, "marshal current commits")
-	err = os.WriteFile(latestCommitsFile, bs, 0666)
+	err = os.WriteFile(latestCommitsFile, bs, 0600)
 	requireNoError(err, "write current commits")
 }
 

@@ -49,7 +49,9 @@ func expectStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string, val
 	}
 }
 
-func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern string, expectedCount int, expectedValues ...int64) {
+//nolint:unparam
+func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer,
+	samplePattern string, expectedCount int, expectedValues ...int64) {
 	t.Helper()
 	profile, err := gprofile.ParseData(buffer.Bytes())
 	require.NoError(t, err)
@@ -60,7 +62,10 @@ func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern stri
 			cnt++
 		}
 	}
-	assert.Equalf(t, expectedCount, cnt, "expected samples re: %s\n   values: %v\n    count:%d\n    all samples:%+v\n", samplePattern, expectedValues, expectedCount, samples)
+	assert.Equalf(t, expectedCount, cnt, "expected samples re: %s\n"+
+		"   values: %v\n"+
+		"    count:%d\n"+
+		"    all samples:%+v\n", samplePattern, expectedValues, expectedCount, samples)
 }
 
 func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sample {
@@ -117,11 +122,6 @@ func stackCollapseProfile(p *gprofile.Profile) []stack {
 		}
 		unique = append(unique, s)
 	}
-	// t.Log("============= stackCollapseProfile ================")
-	//for _, s := range unique {
-	//	t.Log(s.line, s.value)
-	//}
-	//t.Log("===================================================")
 
 	return unique
 }

@@ -1,4 +1,4 @@
-//nolint:gochecknoglobals,gochecknoglobals
+//nolint:gochecknoglobals,gochecknoglobals,lll
 package compat
 
 import (

@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+const (
+	scalerMutexProfileName = "ScalerMutexProfile"
+	scalerBlockProfileName = "ScalerBlockProfile"
+)
+
 func BenchmarkHeapCompression(b *testing.B) {
 	h := newHeapTestHelper()
 	fs := h.generateMemProfileRecords(512, 32)
@@ -28,9 +33,9 @@ func BenchmarkHeapCompression(b *testing.B) {
 
 func BenchmarkMutexCompression(b *testing.B) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		b.Run(name, func(b *testing.B) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
