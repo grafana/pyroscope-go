@@ -1,6 +1,7 @@
 //go:build go1.21
 // +build go1.21
 
+//nolint:gochecknoglobals,lll
 package compat
 
 import (
@@ -203,7 +204,7 @@ func TestMutex(t *testing.T) {
 }
 
 func profileToStrings(p *profile.Profile) []string {
-	var res []string
+	var res = make([]string, 0, len(p.Sample))
 	for _, s := range p.Sample {
 		res = append(res, sampleToString(s))
 	}
@@ -278,7 +279,7 @@ type opAlloc struct {
 type opCall struct {
 }
 
-var sink []byte //nolint:gochecknoglobals,unused
+var sink []byte
 
 func storeAlloc() {
 	sink = make([]byte, 16)

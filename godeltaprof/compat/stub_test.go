@@ -11,6 +11,7 @@ import (
 )
 
 func checkSignature(t *testing.T, pkg string, name string, expectedSignature string) {
+	t.Helper()
 	cfg := &packages.Config{
 		Mode:  packages.NeedImports | packages.NeedExportFile | packages.NeedTypes | packages.NeedSyntax,
 		Tests: true,

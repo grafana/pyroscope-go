@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals,gochecknoglobals
 package compat
 
 import (
@@ -124,9 +125,6 @@ func TestScaleHeap(t *testing.T) {
 
 	const size = 64 * 1024
 	const iters = 1024
-
-	const expectedCount = iters
-	const expectedTime = 1000000
 
 	bufs = make([][]byte, 0, iters)
 	defer func() {

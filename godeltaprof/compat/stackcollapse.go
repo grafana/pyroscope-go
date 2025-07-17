@@ -28,7 +28,6 @@ func expectEmptyProfile(t *testing.T, buffer io.Reader) {
 	assert.Empty(t, ls)
 }
 
-
 func expectNoStackFrames(t *testing.T, buffer *bytes.Buffer, sfPattern string) {
 	t.Helper()
 	profile, err := gprofile.ParseData(buffer.Bytes())
@@ -66,7 +65,7 @@ func expectPPROFLocations(t *testing.T, buffer *bytes.Buffer, samplePattern stri
 
 func grepSamples(profile *gprofile.Profile, samplePattern string) []*gprofile.Sample {
 	rr := regexp.MustCompile(samplePattern)
-	var samples []*gprofile.Sample
+	var samples = make([]*gprofile.Sample, 0, len(profile.Sample))
 	for i := range profile.Sample {
 		ss := pprofSampleStackToString(profile.Sample[i])
 		if !rr.MatchString(ss) {
@@ -90,7 +89,7 @@ func findStack(res []stack, re string) *stack {
 }
 
 func stackCollapseProfile(p *gprofile.Profile) []stack {
-	var ret []stack
+	var ret = make([]stack, 0, len(p.Sample))
 	for _, s := range p.Sample {
 		funcs, strSample := pprofSampleStackToStrings(s)
 		ret = append(ret, stack{
@@ -102,7 +101,7 @@ func stackCollapseProfile(p *gprofile.Profile) []stack {
 	sort.Slice(ret, func(i, j int) bool {
 		return strings.Compare(ret[i].line, ret[j].line) < 0
 	})
-	var unique []stack
+	var unique = make([]stack, 0, len(ret))
 	for _, s := range ret {
 		if len(unique) == 0 {
 			unique = append(unique, s)

@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals,gochecknoglobals
 package compat
 
 import (
@@ -9,6 +10,7 @@ import (
 
 	gprofile "github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
@@ -268,7 +270,7 @@ func TestHeapDuplicates(t *testing.T) {
 		h.r(11, 11*blockSize, 11, 11*blockSize, stack4),
 	)
 	pp, err := gprofile.ParseData(p.Bytes())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	scale := func(c, b int) []int64 {
 		c1, b1 := pprof.ScaleHeapSample(int64(c), int64(b), testMemProfileRate)

@@ -3,6 +3,7 @@
 
 package compat
 
+//nolint:lll
 import "testing"
 
 func TestRuntimeFrameSymbolName(t *testing.T) {

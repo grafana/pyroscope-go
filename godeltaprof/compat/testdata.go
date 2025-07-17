@@ -159,12 +159,13 @@ func getFunctionPointers() []uintptr {
 	}
 }
 
+//nolint:unparam
 func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemProfileRecord {
 	var records []runtime.MemProfileRecord
 
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
-		nobj := int(uint64(h.rng.Int63())) % 1000000
+		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
 		r := runtime.MemProfileRecord{
 			AllocObjects: int64(nobj),
 			AllocBytes:   int64(nobj * 1024),
@@ -172,7 +173,7 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemPr
 			FreeBytes:    int64(nobj * 1024),
 		}
 		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)]
+			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
 		}
 		records = append(records, r)
 	}
@@ -180,17 +181,18 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemPr
 	return records
 }
 
+//nolint:unparam
 func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []runtime.BlockProfileRecord {
 	var records []runtime.BlockProfileRecord
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
-		nobj := int(uint64(h.rng.Int63())) % 1000000
+		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
 		r := runtime.BlockProfileRecord{
 			Count:  int64(nobj),
 			Cycles: int64(nobj * 10),
 		}
 		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)]
+			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
 		}
 		records = append(records, r)
 	}
@@ -256,7 +258,7 @@ func (h *mutexTestHelper) r(count, cycles int64, s [32]uintptr) runtime.BlockPro
 func (h *mutexTestHelper) mutate(nmutations int, fs []runtime.BlockProfileRecord) {
 	oneBlockCycles := fs[0].Cycles / fs[0].Count
 	for j := 0; j < nmutations; j++ {
-		idx := int(uint(h.rng.Int63())) % len(fs)
+		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
 		fs[idx].Count += 1
 		fs[idx].Cycles += oneBlockCycles
 	}
@@ -293,12 +295,13 @@ func (h *heapTestHelper) dump(r ...runtime.MemProfileRecord) *bytes.Buffer {
 	return buf
 }
 
-func (h *heapTestHelper) r(AllocObjects, AllocBytes, FreeObjects, FreeBytes int64, s [32]uintptr) runtime.MemProfileRecord {
+func (h *heapTestHelper) r(allocObjects, allocBytes, freeObjects, freeBytes int64,
+	s [32]uintptr) runtime.MemProfileRecord {
 	return runtime.MemProfileRecord{
-		AllocObjects: AllocObjects,
-		AllocBytes:   AllocBytes,
-		FreeBytes:    FreeBytes,
-		FreeObjects:  FreeObjects,
+		AllocObjects: allocObjects,
+		AllocBytes:   allocBytes,
+		FreeBytes:    freeBytes,
+		FreeObjects:  freeObjects,
 		Stack0:       s,
 	}
 }
@@ -306,7 +309,7 @@ func (h *heapTestHelper) r(AllocObjects, AllocBytes, FreeObjects, FreeBytes int6
 func (h *heapTestHelper) mutate(nmutations int, fs []runtime.MemProfileRecord) {
 	objSize := fs[0].AllocBytes / fs[0].AllocObjects
 	for j := 0; j < nmutations; j++ {
-		idx := int(uint(h.rng.Int63())) % len(fs)
+		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
 		fs[idx].AllocObjects += 1
 		fs[idx].AllocBytes += objSize
 		fs[idx].FreeObjects += 1
