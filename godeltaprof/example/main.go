@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec
 	"runtime"
 	"sync"
 	"time"
@@ -18,11 +18,11 @@ func work(n int) {
 	// revive:disable:empty-block this is fine because this is a example app, not real production code
 	for i := 0; i < n; i++ {
 	}
-	fmt.Printf("work\n")
+	fmt.Printf("work\n") //nolint:forbidigo
 	// revive:enable:empty-block
 }
 
-var m sync.Mutex
+var m sync.Mutex //nolint:gochecknoglobals
 
 func fastFunction(wg *sync.WaitGroup) {
 	m.Lock()
@@ -43,7 +43,7 @@ func slowFunction(wg *sync.WaitGroup) {
 
 func main() {
 	go func() {
-		err := http.ListenAndServe("localhost:6060", http.DefaultServeMux)
+		err := http.ListenAndServe("localhost:6060", http.DefaultServeMux) //nolint:gosec
 		if err != nil {
 			panic(err)
 		}
@@ -54,9 +54,9 @@ func main() {
 		deltaMutexProfiler := godeltaprof.NewMutexProfiler()
 		for {
 			time.Sleep(10 * time.Second)
-			deltaHeapProfiler.Profile(bytes.NewBuffer(nil))
-			deltaBlockProfiler.Profile(bytes.NewBuffer(nil))
-			deltaMutexProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaHeapProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaBlockProfiler.Profile(bytes.NewBuffer(nil))
+			_ = deltaMutexProfiler.Profile(bytes.NewBuffer(nil))
 		}
 	}()
 	runtime.SetMutexProfileFraction(5)

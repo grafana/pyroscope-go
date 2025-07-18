@@ -102,6 +102,7 @@ func Start(cfg Config) (*Profiler, error) {
 func (p *Profiler) Stop() error {
 	p.session.Stop()
 	p.uploader.Stop()
+
 	return nil
 }
 
@@ -112,7 +113,7 @@ func (p *Profiler) Flush(wait bool) {
 
 type LabelSet = pprof.LabelSet
 
-var Labels = pprof.Labels
+var Labels = pprof.Labels //nolint:gochecknoglobals
 
 func TagWrapper(ctx context.Context, labels LabelSet, cb func(context.Context)) {
 	pprof.Do(ctx, labels, func(c context.Context) { cb(c) })

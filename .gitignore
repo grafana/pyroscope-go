@@ -1,4 +1,6 @@
 .idea/
 .vscode/
+.tools/
 
 main
+timing

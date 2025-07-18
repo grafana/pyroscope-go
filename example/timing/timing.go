@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -19,6 +19,7 @@ func isPrime(n int64) bool {
 			return false
 		}
 	}
+
 	return false
 }
 
@@ -28,6 +29,7 @@ func slow(n int64) int64 {
 	for i := int64(1); i <= n; i++ {
 		sum += i
 	}
+
 	return sum
 }
 
@@ -42,6 +44,7 @@ func fast(n int64) int64 {
 		}
 		sum += (b - a + 1) * (a + b) / 2
 	}
+
 	return sum
 }
 
@@ -305,7 +308,7 @@ func isPrimeMux(n, d int64) bool {
 
 //go:noinline
 func main() {
-	pyroscopeProfiler, _ := pyroscope.Start(pyroscope.Config{
+	pyroscopeProfiler, err := pyroscope.Start(pyroscope.Config{
 		ApplicationName: "timing-demo",
 		ServerAddress:   "http://localhost:4040",
 		ProfileTypes: []pyroscope.ProfileType{
@@ -313,22 +316,31 @@ func main() {
 		},
 		Logger: pyroscope.StandardLogger,
 	})
-	fmt.Println(pyroscopeProfiler)
-	// defer pyroscopeProfiler.Stop()
+	if err != nil {
+		log.Fatal(err)
+
+		return
+	}
+	defer func() {
+		err = pyroscopeProfiler.Stop()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	startTime := time.Now()
-	base := rand.Int63n(1000000) + 1
+	base := rand.Int63n(1000000) + 1 //nolint:gosec
 	for i := int64(0); i < 40000000; i++ {
 		secs := int64(time.Since(startTime) / time.Second)
 		if secs > 15 {
 			break
 		}
-		n := rand.Int63n(10000) + 1
+		n := rand.Int63n(10000) + 1 //nolint:gosec
 
 		if isPrimeMux(base+i, secs) {
-			slowMux(n, secs)
+			_ = slowMux(n, secs)
 		} else {
-			fastMux(n, secs)
+			_ = fastMux(n, secs)
 		}
 	}
 }

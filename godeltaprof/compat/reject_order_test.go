@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	gprofile "github.com/google/pprof/profile"
-	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
 func TestHeapReject(t *testing.T) {
@@ -17,25 +18,25 @@ func TestHeapReject(t *testing.T) {
 	fs := h.generateMemProfileRecords(512, 32)
 	p1 := bytes.NewBuffer(nil)
 	err := WriteHeapProto(h.dp, h.opt, p1, fs, int64(runtime.MemProfileRate))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	p1Size := p1.Len()
 	profile, err := gprofile.Parse(p1)
 	require.NoError(t, err)
-	ls := stackCollapseProfile(t, profile)
+	ls := stackCollapseProfile(profile)
 	assert.Len(t, ls, 512)
 	assert.Len(t, profile.Location, 141)
 	t.Log("p1 size", p1Size)
 
 	p2 := bytes.NewBuffer(nil)
 	err = WriteHeapProto(h.dp, h.opt, p2, fs, int64(runtime.MemProfileRate))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	p2Size := p2.Len()
 	assert.Less(t, p2Size, 1000)
 	profile, err = gprofile.Parse(p2)
 	require.NoError(t, err)
-	ls = stackCollapseProfile(t, profile)
-	assert.Len(t, ls, 0)
-	assert.Len(t, profile.Location, 0)
+	ls = stackCollapseProfile(profile)
+	assert.Empty(t, ls)
+	assert.Empty(t, profile.Location)
 	t.Log("p2 size", p2Size)
 }
 
@@ -44,20 +45,23 @@ func BenchmarkHeapRejectOrder(b *testing.B) {
 	fs := h.generateMemProfileRecords(512, 32)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
+		err := WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
-var mutexProfileScalers = []pprof.MutexProfileScaler{
+var mutexProfileScalers = []pprof.MutexProfileScaler{ //nolint:gochecknoglobals
 	pprof.ScalerMutexProfile,
 	pprof.ScalerBlockProfile,
 }
 
 func TestMutexReject(t *testing.T) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		t.Run(name, func(t *testing.T) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
@@ -69,32 +73,32 @@ func TestMutexReject(t *testing.T) {
 			fs := h.generateBlockProfileRecords(512, 32)
 			p1 := bytes.NewBuffer(nil)
 			err := PrintCountCycleProfile(h.dp, h.opt, p1, scaler, fs)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			profile, err := gprofile.Parse(p1)
 			require.NoError(t, err)
-			ls := stackCollapseProfile(t, profile)
+			ls := stackCollapseProfile(profile)
 			assert.Len(t, ls, 512)
 			assert.Len(t, profile.Location, 141)
 
 			p2 := bytes.NewBuffer(nil)
 			err = PrintCountCycleProfile(h.dp, h.opt, p2, scaler, fs)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			p2Size := p2.Len()
 			assert.Less(t, p2Size, 1000)
 			profile, err = gprofile.Parse(p2)
 			require.NoError(t, err)
-			ls = stackCollapseProfile(t, profile)
-			assert.Len(t, ls, 0)
-			assert.Len(t, profile.Location, 0)
+			ls = stackCollapseProfile(profile)
+			assert.Empty(t, ls)
+			assert.Empty(t, profile.Location)
 		})
 	}
 }
 
 func BenchmarkMutexRejectOrder(b *testing.B) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		b.Run(name, func(b *testing.B) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
@@ -106,9 +110,11 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
+				err := PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
-
 	}
 }

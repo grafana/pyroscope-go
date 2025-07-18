@@ -29,6 +29,7 @@ func Test_StartCPUProfile_interrupts_background_profiling(t *testing.T) {
 	// Try to interrupt it with StartCPUProfile.
 	start := collector.waitStartCPUProfile()
 	stop := collector.waitStopCPUProfile()
+
 	if err := c.StartCPUProfile(io.Discard); err != nil {
 		t.Fatal("failed to start CPU profiling")
 	}
@@ -77,6 +78,7 @@ func Test_StartCPUProfile_blocks_Stop(t *testing.T) {
 	// Try to interrupt it with StartCPUProfile.
 	start := collector.waitStartCPUProfile()
 	stop := collector.waitStopCPUProfile()
+
 	if err := c.StartCPUProfile(io.Discard); err != nil {
 		t.Fatal("failed to start CPU profiling")
 	}
@@ -102,6 +104,7 @@ func Test_StartCPUProfile_blocks_Stop(t *testing.T) {
 
 type mockCollector struct {
 	sync.Mutex
+
 	start chan struct{}
 	stop  chan struct{}
 }
@@ -111,6 +114,7 @@ func (m *mockCollector) waitStartCPUProfile() <-chan struct{} {
 	c := make(chan struct{})
 	m.start = c
 	m.Unlock()
+
 	return c
 }
 
@@ -119,6 +123,7 @@ func (m *mockCollector) waitStopCPUProfile() <-chan struct{} {
 	c := make(chan struct{})
 	m.stop = c
 	m.Unlock()
+
 	return c
 }
 
@@ -129,6 +134,7 @@ func (m *mockCollector) StartCPUProfile(_ io.Writer) error {
 		m.start = nil
 	}
 	m.Unlock()
+
 	return nil
 }
 

@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+const (
+	scalerMutexProfileName = "ScalerMutexProfile"
+	scalerBlockProfileName = "ScalerBlockProfile"
+)
+
 func BenchmarkHeapCompression(b *testing.B) {
 	h := newHeapTestHelper()
 	fs := h.generateMemProfileRecords(512, 32)
@@ -18,7 +23,7 @@ func BenchmarkHeapCompression(b *testing.B) {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
 				b.Errorf("unexpected random value: %d. "+
-					"The bench should be deterministic for better comparision.", v)
+					"The bench should be deterministic for better comparison.", v)
 			}
 		}
 		_ = WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
@@ -28,9 +33,9 @@ func BenchmarkHeapCompression(b *testing.B) {
 
 func BenchmarkMutexCompression(b *testing.B) {
 	for i, scaler := range mutexProfileScalers {
-		name := "ScalerMutexProfile"
+		name := scalerMutexProfileName
 		if i == 1 {
-			name = "ScalerBlockProfile"
+			name = scalerBlockProfileName
 		}
 		b.Run(name, func(b *testing.B) {
 			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
@@ -49,13 +54,12 @@ func BenchmarkMutexCompression(b *testing.B) {
 					v := h.rng.Int63()
 					if v != 7817861117094116717 {
 						b.Errorf("unexpected random value: %d. "+
-							"The bench should be deterministic for better comparision.", v)
+							"The bench should be deterministic for better comparison.", v)
 					}
 				}
 				_ = PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
 				h.mutate(nmutations, fs)
 			}
 		})
-
 	}
 }

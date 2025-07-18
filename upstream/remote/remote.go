@@ -2,6 +2,7 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,8 @@ import (
 	"github.com/grafana/pyroscope-go/upstream"
 )
 
-var errCloudTokenRequired = errors.New("please provide an authentication token. You can find it here: https://pyroscope.io/cloud")
+var errCloudTokenRequired = errors.New("please provide an authentication token." +
+	" You can find it here: https://pyroscope.io/cloud")
 
 const (
 	authTokenDeprecationWarning = "Authtoken is specified, but deprecated and ignored. " +
@@ -150,7 +152,7 @@ func (r *Remote) Flush() {
 func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	u, err := url.Parse(r.cfg.Address)
 	if err != nil {
-		return fmt.Errorf("url parse: %v", err)
+		return fmt.Errorf("url parse: %w", err)
 	}
 
 	body := &bytes.Buffer{}
@@ -160,14 +162,7 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	if err != nil {
 		return err
 	}
-	fw.Write(j.Profile)
-	if j.PrevProfile != nil {
-		fw, err = writer.CreateFormFile("prev_profile", "profile.pprof")
-		if err != nil {
-			return err
-		}
-		fw.Write(j.PrevProfile)
-	}
+	_, _ = fw.Write(j.Profile)
 	if j.SampleTypeConfig != nil {
 		fw, err = writer.CreateFormFile("sample_type_config", "sample_type_config.json")
 		if err != nil {
@@ -177,9 +172,11 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 		if err != nil {
 			return err
 		}
-		fw.Write(b)
+		_, _ = fw.Write(b)
 	}
-	writer.Close()
+	if err = writer.Close(); err != nil {
+		return err
+	}
 
 	q := u.Query()
 	q.Set("name", j.Name)
@@ -195,20 +192,21 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 
 	r.logger.Debugf("uploading at %s", u.String())
 	// new a request for the job
-	request, err := http.NewRequest("POST", u.String(), body)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, u.String(), body)
 	if err != nil {
-		return fmt.Errorf("new http request: %v", err)
+		return fmt.Errorf("new http request: %w", err)
 	}
 	contentType := writer.FormDataContentType()
 	r.logger.Debugf("content type: %s", contentType)
 	request.Header.Set("Content-Type", contentType)
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
-	if r.cfg.AuthToken != "" && isOGPyroscopeCloud(u) {
+	switch {
+	case r.cfg.AuthToken != "" && isOGPyroscopeCloud(u):
 		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
-	} else if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
+	case r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "":
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
-	} else if r.cfg.AuthToken != "" {
+	case r.cfg.AuthToken != "":
 		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
 		r.logger.Infof(authTokenDeprecationWarning)
 	}
@@ -222,18 +220,21 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	// do the request and get the response
 	response, err := r.client.Do(request)
 	if err != nil {
-		return fmt.Errorf("do http request: %v", err)
+		return fmt.Errorf("do http request: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	// read all the response body
 	respBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("read response body: %v", err)
+		return fmt.Errorf("read response body: %w", err)
 	}
 
-	if response.StatusCode != 200 {
-		return fmt.Errorf("failed to upload. server responded with statusCode: '%d' and body: '%s'", response.StatusCode, string(respBody))
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to upload: (%d) '%s'", //nolint:err113
+			response.StatusCode, string(respBody))
 	}
 
 	return nil
@@ -245,6 +246,7 @@ func (r *Remote) handleJobs() {
 		select {
 		case <-r.done:
 			r.wg.Done()
+
 			return
 		case j := <-r.jobs:
 			r.safeUpload(j.upload)
