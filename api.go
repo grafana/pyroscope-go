@@ -62,13 +62,13 @@ func Start(cfg Config) (*Profiler, error) {
 	}
 
 	sc := SessionConfig{
-		Upstream:               uploader,
-		Logger:                 cfg.Logger,
-		AppName:                cfg.ApplicationName,
-		Tags:                   cfg.Tags,
-		ProfilingTypes:         cfg.ProfileTypes,
-		DisableGCRuns:          cfg.DisableGCRuns,
-		UploadRate:             cfg.UploadRate,
+		Upstream:       uploader,
+		Logger:         cfg.Logger,
+		AppName:        cfg.ApplicationName,
+		Tags:           cfg.Tags,
+		ProfilingTypes: cfg.ProfileTypes,
+		DisableGCRuns:  cfg.DisableGCRuns,
+		UploadRate:     cfg.UploadRate,
 	}
 
 	s, err := NewSession(sc)

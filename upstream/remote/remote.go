@@ -18,7 +18,6 @@ import (
 	"github.com/grafana/pyroscope-go/upstream"
 )
 
-
 type Remote struct {
 	mu     sync.Mutex
 	cfg    Config
@@ -87,6 +86,7 @@ func NewRemote(cfg Config) (*Remote, error) {
 	}
 
 	_ = u
+
 	return r, nil
 }
 
@@ -182,8 +182,7 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	request.Header.Set("Content-Type", contentType)
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
-	switch {
-	case r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "":
+	if r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "" {
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
 	}
 	if r.cfg.TenantID != "" {
