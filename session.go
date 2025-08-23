@@ -275,15 +275,7 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 				SpyName:         "gospy",
 				Units:           "goroutines",
 				AggregationType: "average",
-				Format:          upstream.FormatPprof,
 				Profile:         copyBuf(ps.goroutinesBuf.Bytes()),
-				SampleTypeConfig: map[string]*upstream.SampleType{
-					"goroutine": {
-						DisplayName: "goroutines",
-						Units:       "goroutines",
-						Aggregation: "average",
-					},
-				},
 			})
 			ps.goroutinesBuf.Reset()
 		}
@@ -324,14 +316,12 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 		}
 		curMemBytes := copyBuf(ps.memBuf.Bytes())
 		job := &upstream.UploadJob{
-			Name:             ps.appName,
-			StartTime:        startTime,
-			EndTime:          endTime,
-			SpyName:          "gospy",
-			SampleRate:       100,
-			Format:           upstream.FormatPprof,
-			Profile:          curMemBytes,
-			SampleTypeConfig: sampleTypeConfigHeap,
+			Name:       ps.appName,
+			StartTime:  startTime,
+			EndTime:    endTime,
+			SpyName:    "gospy",
+			SampleRate: 100,
+			Profile:    curMemBytes,
 		}
 		ps.upstream.Upload(job)
 		ps.lastGCGeneration = currentGCGeneration
@@ -353,13 +343,11 @@ func (ps *Session) dumpMutexProfile(startTime time.Time, endTime time.Time) {
 	}
 	curMutexBuf := copyBuf(ps.mutexBuf.Bytes())
 	job := &upstream.UploadJob{
-		Name:             ps.appName,
-		StartTime:        startTime,
-		EndTime:          endTime,
-		SpyName:          "gospy",
-		Format:           upstream.FormatPprof,
-		Profile:          curMutexBuf,
-		SampleTypeConfig: sampleTypeConfigMutex,
+		Name:      ps.appName,
+		StartTime: startTime,
+		EndTime:   endTime,
+		SpyName:   "gospy",
+		Profile:   curMutexBuf,
 	}
 	ps.upstream.Upload(job)
 }
@@ -379,13 +367,11 @@ func (ps *Session) dumpBlockProfile(startTime time.Time, endTime time.Time) {
 	}
 	curBlockBuf := copyBuf(ps.blockBuf.Bytes())
 	job := &upstream.UploadJob{
-		Name:             ps.appName,
-		StartTime:        startTime,
-		EndTime:          endTime,
-		SpyName:          "gospy",
-		Format:           upstream.FormatPprof,
-		Profile:          curBlockBuf,
-		SampleTypeConfig: sampleTypeConfigBlock,
+		Name:      ps.appName,
+		StartTime: startTime,
+		EndTime:   endTime,
+		SpyName:   "gospy",
+		Profile:   curBlockBuf,
 	}
 	ps.upstream.Upload(job)
 }

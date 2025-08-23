@@ -66,13 +66,11 @@ func TestUploadProfile(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString("OK")),
 			}, nil)
 
-			r := &Remote{
-				cfg:    tt.cfg,
-				client: mockClient,
-				logger: logger,
-			}
-
-			err := r.uploadProfile(&upstream.UploadJob{
+			r, err := NewRemote(tt.cfg)
+			r.client = mockClient
+			r.logger = logger
+			require.NoError(t, err)
+			err = r.uploadProfile(&upstream.UploadJob{
 				Name:       "test-profile",
 				StartTime:  time.Now(),
 				EndTime:    time.Now().Add(time.Minute),

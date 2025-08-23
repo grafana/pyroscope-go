@@ -240,7 +240,6 @@ func (c *cpuProfileCollector) upload() {
 		SampleRate:      DefaultSampleRate,
 		Units:           "samples",
 		AggregationType: "sum",
-		Format:          upstream.FormatPprof,
 		Profile:         copyBuf(buf),
 	})
 	c.buf.Reset()

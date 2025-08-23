@@ -3,11 +3,9 @@ package remote
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -42,6 +40,7 @@ type Remote struct {
 	wg   sync.WaitGroup
 
 	flushWG *sync.WaitGroup
+	url     *url.URL
 }
 
 type HTTPClient interface {
@@ -100,6 +99,7 @@ func NewRemote(cfg Config) (*Remote, error) {
 	if err != nil {
 		return nil, err
 	}
+	r.url = u
 
 	// authorize the token first
 	if cfg.AuthToken == "" && isOGPyroscopeCloud(u) {
@@ -150,35 +150,10 @@ func (r *Remote) Flush() {
 }
 
 func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
-	u, err := url.Parse(r.cfg.Address)
-	if err != nil {
-		return fmt.Errorf("url parse: %w", err)
-	}
-
-	body := &bytes.Buffer{}
-
-	writer := multipart.NewWriter(body)
-	fw, err := writer.CreateFormFile("profile", "profile.pprof")
-	if err != nil {
-		return err
-	}
-	_, _ = fw.Write(j.Profile)
-	if j.SampleTypeConfig != nil {
-		fw, err = writer.CreateFormFile("sample_type_config", "sample_type_config.json")
-		if err != nil {
-			return err
-		}
-		b, err := json.Marshal(j.SampleTypeConfig)
-		if err != nil {
-			return err
-		}
-		_, _ = fw.Write(b)
-	}
-	if err = writer.Close(); err != nil {
-		return err
-	}
+	u := *r.url
 
 	q := u.Query()
+	q.Set("format", "pprof")
 	q.Set("name", j.Name)
 	q.Set("from", strconv.FormatInt(j.StartTime.UnixNano(), 10))
 	q.Set("until", strconv.FormatInt(j.EndTime.UnixNano(), 10))
@@ -191,18 +166,20 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	u.RawQuery = q.Encode()
 
 	r.logger.Debugf("uploading at %s", u.String())
-	// new a request for the job
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, u.String(), body)
+
+	request, err := http.NewRequestWithContext(
+		context.Background(), // todo: timeout
+		http.MethodPost,
+		u.String(),
+		bytes.NewReader(j.Profile),
+	)
 	if err != nil {
 		return fmt.Errorf("new http request: %w", err)
 	}
-	contentType := writer.FormDataContentType()
-	r.logger.Debugf("content type: %s", contentType)
-	request.Header.Set("Content-Type", contentType)
-	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
+	request.Header.Set("Content-Type", "binary/octet-stream+pprof")
 
 	switch {
-	case r.cfg.AuthToken != "" && isOGPyroscopeCloud(u):
+	case r.cfg.AuthToken != "" && isOGPyroscopeCloud(&u):
 		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
 	case r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "":
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
