@@ -54,16 +54,6 @@ type SessionConfig struct {
 	ProfilingTypes []ProfileType
 	DisableGCRuns  bool
 	UploadRate     time.Duration
-
-	// Deprecated: the field will be removed in future releases.
-	// Use UploadRate instead.
-	DisableAutomaticResets bool
-	// Deprecated: the field will be removed in future releases.
-	// DisableCumulativeMerge is ignored.
-	DisableCumulativeMerge bool
-	// Deprecated: the field will be removed in future releases.
-	// SampleRate is set to 100 and is not configurable.
-	SampleRate uint32
 }
 
 type flush struct {
@@ -83,10 +73,6 @@ func NewSession(c SessionConfig) (*Session, error) {
 	c.Logger.Infof("  ProfilingTypes: %+v", c.ProfilingTypes)
 	c.Logger.Infof("  DisableGCRuns:  %+v", c.DisableGCRuns)
 	c.Logger.Infof("  UploadRate:     %+v", c.UploadRate)
-
-	if c.DisableAutomaticResets {
-		c.UploadRate = math.MaxInt64
-	}
 
 	appName, err := mergeTagsWithAppName(c.AppName, newSessionID(), c.Tags)
 	if err != nil {

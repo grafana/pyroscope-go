@@ -23,19 +23,6 @@ type Config struct {
 	DisableGCRuns     bool // this will disable automatic runtime.GC runs between getting the heap profiles
 	HTTPHeaders       map[string]string
 	HTTPClient        remote.HTTPClient
-
-	// Deprecated: the field will be removed in future releases.
-	// Use BasicAuthUser and BasicAuthPassword instead.
-	AuthToken string // specify this token when using pyroscope cloud
-	// Deprecated: the field will be removed in future releases.
-	// Use UploadRate instead.
-	DisableAutomaticResets bool
-	// Deprecated: the field will be removed in future releases.
-	// DisableCumulativeMerge is ignored.
-	DisableCumulativeMerge bool
-	// Deprecated: the field will be removed in future releases.
-	// SampleRate is set to 100 and is not configurable.
-	SampleRate uint32
 }
 
 type Profiler struct {
@@ -59,7 +46,6 @@ func Start(cfg Config) (*Profiler, error) {
 	}
 
 	rc := remote.Config{
-		AuthToken:         cfg.AuthToken,
 		TenantID:          cfg.TenantID,
 		BasicAuthUser:     cfg.BasicAuthUser,
 		BasicAuthPassword: cfg.BasicAuthPassword,
@@ -82,7 +68,6 @@ func Start(cfg Config) (*Profiler, error) {
 		Tags:                   cfg.Tags,
 		ProfilingTypes:         cfg.ProfileTypes,
 		DisableGCRuns:          cfg.DisableGCRuns,
-		DisableAutomaticResets: cfg.DisableAutomaticResets,
 		UploadRate:             cfg.UploadRate,
 	}
 
