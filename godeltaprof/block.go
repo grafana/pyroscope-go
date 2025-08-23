@@ -30,6 +30,7 @@ type BlockProfiler struct {
 	runtimeProfile func([]runtime.BlockProfileRecord) (int, bool)
 	scaleProfile   pprof.MutexProfileScaler
 	options        pprof.ProfileBuilderOptions
+	gz             gz
 }
 
 // NewMutexProfiler creates a new BlockProfiler instance for profiling mutex contention.
@@ -115,8 +116,9 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 
 	sort.Slice(p, func(i, j int) bool { return p[i].Cycles > p[j].Cycles })
 
+	zw := d.gz.get(w)
 	stc := pprof.MutexProfileConfig()
-	b := pprof.NewProfileBuilder(w, &d.options, stc)
+	b := pprof.NewProfileBuilder(w, zw, &d.options, stc)
 
 	return d.impl.PrintCountCycleProfile(b, d.scaleProfile, p)
 }

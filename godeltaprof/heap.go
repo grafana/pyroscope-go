@@ -31,6 +31,7 @@ type HeapProfiler struct {
 	impl    pprof.DeltaHeapProfiler
 	mutex   sync.Mutex
 	options pprof.ProfileBuilderOptions
+	gz      gz
 }
 
 func NewHeapProfiler() *HeapProfiler {
@@ -79,7 +80,9 @@ func (d *HeapProfiler) Profile(w io.Writer) error {
 		// Profile grew; try again.
 	}
 	rate := int64(runtime.MemProfileRate)
-	b := pprof.NewProfileBuilder(w, &d.options, pprof.HeapProfileConfig(rate))
+
+	zw := d.gz.get(w)
+	b := pprof.NewProfileBuilder(w, zw, &d.options, pprof.HeapProfileConfig(rate))
 
 	return d.impl.WriteHeapProto(b, p, rate)
 }

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 )
 
 type ProfileBuilderOptions struct {
@@ -41,7 +43,7 @@ type profileBuilder struct {
 
 	// encoding state
 	w         io.Writer
-	zw        gzipWriter
+	zw        *gzip.Writer
 	pb        protobuf
 	strings   []string
 	stringMap map[string]int
@@ -269,8 +271,7 @@ type locInfo struct {
 // CPU profiling data obtained from the runtime can be added
 // by calling b.addCPUData, and then the eventual profile
 // can be obtained by calling b.finish.
-func NewProfileBuilder(w io.Writer, opt *ProfileBuilderOptions, stc ProfileConfig) ProfileBuilder {
-	zw := newGzipWriter(w)
+func NewProfileBuilder(w io.Writer, zw *gzip.Writer, opt *ProfileBuilderOptions, stc ProfileConfig) ProfileBuilder {
 	b := &profileBuilder{
 		w:         w,
 		zw:        zw,
