@@ -2,7 +2,6 @@ package pyroscope
 
 import (
 	"bytes"
-	"math"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
@@ -20,8 +19,6 @@ type Session struct {
 	profileTypes  []ProfileType
 	uploadRate    time.Duration
 	disableGCRuns bool
-	// Deprecated: the field will be removed in future releases.
-	DisableAutomaticResets bool
 
 	logger   Logger
 	stopOnce sync.Once

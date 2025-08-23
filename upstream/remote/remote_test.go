@@ -9,10 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/pyroscope-go/internal/testutil"
 	"github.com/grafana/pyroscope-go/upstream"
@@ -24,35 +22,15 @@ func TestUploadProfile(t *testing.T) {
 		cfg                Config
 		serverAddress      string
 		expectedAuthHeader string
-		expectWarning      bool
 	}{
 		{
-			name: "OG Pyroscope Cloud with AuthToken",
-			cfg: Config{
-				AuthToken: "test-token",
-				Address:   "https://example.pyroscope.cloud",
-			},
-			expectedAuthHeader: "Bearer test-token",
-			expectWarning:      false,
-		},
-		{
-			name: "Non-OG Server with BasicAuth",
+			name: "Server with BasicAuth",
 			cfg: Config{
 				BasicAuthUser:     "user",
 				BasicAuthPassword: "pass",
 				Address:           "https://example.com",
 			},
 			expectedAuthHeader: "Basic dXNlcjpwYXNz", // Base64 encoded "user:pass"
-			expectWarning:      false,
-		},
-		{
-			name: "Non-OG Server with AuthToken (Deprecated)",
-			cfg: Config{
-				AuthToken: "deprecated-token",
-				Address:   "https://example.com",
-			},
-			expectedAuthHeader: "Bearer deprecated-token",
-			expectWarning:      true,
 		},
 	}
 
@@ -81,12 +59,6 @@ func TestUploadProfile(t *testing.T) {
 				Units:      "samples",
 			})
 			require.NoError(t, err)
-
-			if tt.expectWarning {
-				assert.Contains(t, logger.Lines(), authTokenDeprecationWarning)
-			} else {
-				assert.NotContains(t, logger.Lines(), authTokenDeprecationWarning)
-			}
 
 			mockClient.AssertCalled(t, "Do", mock.MatchedBy(func(req *http.Request) bool {
 				return req.Header.Get("Authorization") == tt.expectedAuthHeader
