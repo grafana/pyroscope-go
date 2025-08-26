@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"runtime"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
@@ -320,7 +321,8 @@ func (h *heapTestHelper) mutate(nmutations int, fs []runtime.MemProfileRecord) {
 func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
 	p []runtime.MemProfileRecord, rate int64) error {
 	stc := pprof.HeapProfileConfig(rate)
-	b := pprof.NewProfileBuilder(w, opt, stc)
+	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	b := pprof.NewProfileBuilder(w, zw, opt, stc)
 
 	return dp.WriteHeapProto(b, p, rate)
 }
@@ -328,7 +330,8 @@ func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOption
 func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
 	scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
 	stc := pprof.MutexProfileConfig()
-	b := pprof.NewProfileBuilder(w, opt, stc)
+	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+	b := pprof.NewProfileBuilder(w, zw, opt, stc)
 
 	return d.PrintCountCycleProfile(b, scaler, records)
 }
