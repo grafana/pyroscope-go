@@ -14,8 +14,8 @@ func TestGz(t *testing.T) {
 	}
 
 	var g gz
-	var bufs []bytes.Buffer
-	
+	bufs := make([]bytes.Buffer, 0, len(blobs))
+
 	for i, blob := range blobs {
 		var buf bytes.Buffer
 		gzw := g.get(&buf)
@@ -27,24 +27,27 @@ func TestGz(t *testing.T) {
 		}
 		bufs = append(bufs, buf)
 	}
-	
+
 	for i, blob := range blobs {
 		gzr, err := gzip.NewReader(&bufs[i])
 		if err != nil {
 			t.Fatalf("Failed to create gzip reader for blob %d: %v", i, err)
 		}
-		
 		decompressed, err := io.ReadAll(gzr)
 		if err != nil {
-			gzr.Close()
+			if closeErr := gzr.Close(); closeErr != nil {
+				t.Errorf("Failed to close gzip reader for blob %d: %v", i, closeErr)
+			}
 			t.Fatalf("Failed to decompress blob %d: %v", i, err)
 		}
-		gzr.Close()
-		
+		if err := gzr.Close(); err != nil {
+			t.Errorf("Failed to close gzip reader for blob %d: %v", i, err)
+		}
+
 		if !bytes.Equal(blob, decompressed) {
 			t.Errorf("Blob %d mismatch:\nOriginal:     %q\nDecompressed: %q", i, blob, decompressed)
 		}
-		
+
 		if bytes.Equal(blob, bufs[i].Bytes()) {
 			t.Errorf("Buffer %d should contain compressed data, not original", i)
 		}
