@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/pyroscope-go/godeltaprof"
-	"github.com/grafana/pyroscope-go/internal/flameql"
+	"github.com/grafana/pyroscope-go/internal/labelset"
 	"github.com/grafana/pyroscope-go/upstream"
 )
 
@@ -127,15 +127,15 @@ func NewSession(c SessionConfig) (*Session, error) {
 // App name may be an empty string. Tags must not contain reserved keys,
 // the map is modified in place.
 func mergeTagsWithAppName(appName string, sid sessionID, tags map[string]string) (string, error) {
-	k, err := flameql.ParseKey(appName)
+	k, err := labelset.Parse(appName)
 	if err != nil {
 		return "", err
 	}
 	for tagKey, tagValue := range tags {
-		if flameql.IsTagKeyReserved(tagKey) {
+		if labelset.IsLabelNameReserved(tagKey) {
 			continue
 		}
-		err = flameql.ValidateTagKey(tagKey)
+		err = labelset.ValidateLabelName(tagKey)
 		if err != nil {
 			return "", err
 		}
