@@ -11,7 +11,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.0
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/otel v1.24.0
-	google.golang.org/grpc v1.67.1
+	google.golang.org/grpc v1.79.2
 )
 
 require (
