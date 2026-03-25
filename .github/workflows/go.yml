@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.18', '1.19', '1.20', '1.21', '1.22', '1.23', 'tip']
+        go: ['1.18', '1.19', '1.20', '1.21', '1.22', '1.23', '1.24', '1.25', '1.26', 'tip']
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -52,7 +52,7 @@ jobs:
         run: make go/mod && git diff --exit-code
 
       - name: Run k6 go/mod
-        if: contains('1.22 1.23 tip', matrix.go)
+        if: contains('1.24 1.25 1.26 tip', matrix.go)
         run: cd x/k6 && make go/mod && git diff --exit-code
 
       - name: Install Go stable
@@ -83,7 +83,7 @@ jobs:
           make test
 
       - name: Run k6 tests
-        if: contains('1.22 1.23 tip', matrix.go)
+        if: contains('1.24 1.25 1.26 tip', matrix.go)
         run: |
           which go
           go version
