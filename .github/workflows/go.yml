@@ -71,7 +71,10 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-          make gotip/fix
+
+      - name: Fix outdated go tools for go1.24+
+        if: contains('1.24 1.25 1.26 tip', matrix.go)
+        run: make go/fix_outdated_tools
 
       - name: Build example application
         run: make examples
