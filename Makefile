@@ -20,11 +20,17 @@ go/mod:
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
 
-# Update tools for newer versions without breaking old go versions
+# Update tools for go versions after 1.24
 # https://github.com/grafana/pyroscope-go/issues/129
-.PHONY: go/fix_outdated_tools
-go/fix_outdated_tools:
-	cd godeltaprof/compat/ && GOTOOLCHAIN=local $(GO) get -u golang.org/x/tools@v0.34.0
+.PHONY: go/1_24_outdated_tools
+go/1_24_outdated_tools:
+	cd godeltaprof/compat/ && $(GO) get -u golang.org/x/tools@v0.34.0
+	git --no-pager diff
+
+# Update tools for go versions after 1.27
+.PHONY: go/1_27_outdated_tools
+go/1_27_outdated_tools:
+	cd godeltaprof/compat/ && $(GO) get -u golang.org/x/tools@v0.43.0
 	git --no-pager diff
 
 .PHONY: install-lint
