@@ -2,7 +2,7 @@ module github.com/grafana/pyroscope-go/x/k6
 
 go 1.24.0
 
-toolchain go1.24.13
+toolchain go1.26.1
 
 replace github.com/grafana/pyroscope-go => ../../
 
