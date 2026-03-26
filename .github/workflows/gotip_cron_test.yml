@@ -29,7 +29,6 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-          make gotip/fix
       - name: Build example application
         run: make examples
       - name: Run tests
