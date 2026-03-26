@@ -22,6 +22,7 @@ import (
 
 var errNoExportFile = errors.New("no export file")
 
+//nolint:gochecknoglobals // cache shared across test helpers
 var exportFileCache = make(map[string]string)
 
 func goListExport(pkg string) (string, error) {
