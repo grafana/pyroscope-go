@@ -2,6 +2,7 @@ package compat
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/importer"
@@ -13,18 +14,21 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var exportFileCache sync.Map
+//nolint:gochecknoglobals
+var errNoExportFile = errors.New("no export file")
+
+//nolint:gochecknoglobals
+var exportFileCache = make(map[string]string)
 
 func goListExport(pkg string) (string, error) {
-	if v, ok := exportFileCache.Load(pkg); ok {
-		return v.(string), nil
+	if v, ok := exportFileCache[pkg]; ok {
+		return v, nil
 	}
 	out, err := exec.Command("go", "list", "-export", "-f", "{{.Export}}", pkg).Output()
 	if err != nil {
@@ -32,10 +36,16 @@ func goListExport(pkg string) (string, error) {
 	}
 	path := strings.TrimSpace(string(out))
 	if path == "" {
-		return "", fmt.Errorf("no export file for %s", pkg)
+		return "", fmt.Errorf("%s: %w", pkg, errNoExportFile)
 	}
-	exportFileCache.Store(pkg, path)
+	exportFileCache[pkg] = path
+
 	return path, nil
+}
+
+type goListJSON struct {
+	Dir     string   `json:"Dir"`
+	GoFiles []string `json:"GoFiles"`
 }
 
 func checkSignature(t *testing.T, pkg string, name string, expectedSignature string) {
@@ -47,14 +57,11 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 	out, err := exec.Command("go", "list", "-json", pkg).Output()
 	require.NoError(t, err, "go list -json failed for %s", pkg)
 
-	var pkgInfo struct {
-		Dir     string
-		GoFiles []string
-	}
+	var pkgInfo goListJSON
 	require.NoError(t, json.Unmarshal(out, &pkgInfo))
 
 	fset := token.NewFileSet()
-	var files []*ast.File
+	files := make([]*ast.File, 0, len(pkgInfo.GoFiles))
 	for _, fname := range pkgInfo.GoFiles {
 		f, err := parser.ParseFile(fset, filepath.Join(pkgInfo.Dir, fname), nil, 0)
 		require.NoError(t, err)
@@ -69,7 +76,8 @@ func checkSignature(t *testing.T, pkg string, name string, expectedSignature str
 			if err != nil {
 				return nil, err
 			}
-			return os.Open(exportFile)
+
+			return os.Open(exportFile) //nolint:gosec // export file path from go list is trusted
 		}),
 	}
 	p, err := conf.Check(pkg, fset, files, nil)
