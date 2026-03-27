@@ -49,4 +49,11 @@ var (
 			Cumulative:  false,
 		},
 	}
+	sampleTypeConfigGoroutineLeak = map[string]*upstream.SampleType{ //nolint:gochecknoglobals
+		"goroutineleak": {
+			DisplayName: "goroutine_leak",
+			Units:       "goroutines",
+			Aggregation: "average",
+		},
+	}
 )

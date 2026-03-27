@@ -66,6 +66,8 @@ func main() {
 			pyroscope.ProfileMutexDuration,
 			pyroscope.ProfileBlockCount,
 			pyroscope.ProfileBlockDuration,
+			// Requires Go 1.26+ with GOEXPERIMENT=goroutineleakprofile
+			pyroscope.ProfileGoroutineLeak,
 		},
 		HTTPHeaders: map[string]string{"X-Extra-Header": "extra-header-value"},
 	})
