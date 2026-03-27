@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: '1.22'
 
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Go ${{ matrix.go }}
         if: matrix.go != 'tip'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ matrix.go }}
 
@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Go stable
         if: matrix.go == 'tip'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: 1.x
 
