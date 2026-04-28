@@ -18,6 +18,8 @@ go/mod:
 	cd godeltaprof/compat/ && GO111MODULE=on go mod tidy
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
+	cd example/http/ && GO111MODULE=on go mod download
+	cd example/http/ && GO111MODULE=on go mod tidy
 
 .PHONY: k6/test
 k6/test:
