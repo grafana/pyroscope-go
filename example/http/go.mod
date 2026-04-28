@@ -1,6 +1,6 @@
 module http
 
-go 1.21.3
+go 1.18
 
 require github.com/grafana/pyroscope-go v1.2.8
 
