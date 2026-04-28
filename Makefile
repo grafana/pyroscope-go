@@ -1,4 +1,3 @@
-TEST_PACKAGES := ./... ./godeltaprof/compat/... ./godeltaprof/...
 GO ?= go
 
 GOLANGCI_LINT_VERSION ?= v2.2.2
@@ -7,7 +6,9 @@ GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
 
 .PHONY: test
 test:
-	$(GO) test -race $(shell $(GO) list $(TEST_PACKAGES) | grep -v /example)
+	$(GO) test -race $(shell $(GO) list ./... | grep -v /example)
+	cd godeltaprof && $(GO) test -race ./...
+	cd godeltaprof/compat && $(GO) test -race ./...
 
 .PHONY: go/mod
 go/mod:
