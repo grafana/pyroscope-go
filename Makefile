@@ -19,6 +19,15 @@ go/mod:
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
 
+.PHONY: k6/test
+k6/test:
+	cd x/k6 && $(GO) test -race ./...
+
+.PHONY: k6/go/mod
+k6/go/mod:
+	cd x/k6 && GO111MODULE=on go mod download
+	cd x/k6 && GO111MODULE=on go mod tidy
+
 .PHONY: install-lint
 install-lint:
 	@ mkdir -p $(TOOLS_DIR)
