@@ -23,7 +23,7 @@ type DeltaHeapProfiler struct {
 // WriteHeapProto writes the current heap profile in protobuf format to w.
 //
 //nolint:gocognit
-func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProfileRecord, rate int64) error {
+func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []MemProfileRecord, rate int64) error {
 	values := []int64{0, 0, 0, 0}
 	var locs []uint64
 	// deduplicate: accumulate allocObjects and inuseObjects in entry.acc for equal stacks
@@ -37,7 +37,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
+		entry := d.m.Lookup(memRecordStack(r), uintptr(blockSize))
 		entry.acc.allocObjects += r.AllocObjects
 		entry.acc.inuseObjects += r.InUseObjects()
 	}
@@ -52,7 +52,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 		if r.AllocObjects > 0 {
 			blockSize = r.AllocBytes / r.AllocObjects
 		}
-		entry := d.m.Lookup(r.Stack(), uintptr(blockSize))
+		entry := d.m.Lookup(memRecordStack(r), uintptr(blockSize))
 		if entry.acc == (heapAccValue{}) {
 			continue
 		}
@@ -81,7 +81,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []runtime.MemProf
 
 		hideRuntime := true
 		for tries := 0; tries < 2; tries++ {
-			stk := r.Stack()
+			stk := memRecordStack(r)
 			// For heap profiles, all stack
 			// addresses are return PCs, which is
 			// what appendLocsForStack expects.
