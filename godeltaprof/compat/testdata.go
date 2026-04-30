@@ -245,17 +245,6 @@ func (h *heapTestHelper) dump(r ...pprof.MemProfileRecord) *bytes.Buffer {
 	return buf
 }
 
-func (h *heapTestHelper) mutate(nmutations int, fs []pprof.MemProfileRecord) {
-	objSize := fs[0].AllocBytes / fs[0].AllocObjects
-	for j := 0; j < nmutations; j++ {
-		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
-		fs[idx].AllocObjects += 1
-		fs[idx].AllocBytes += objSize
-		fs[idx].FreeObjects += 1
-		fs[idx].FreeBytes += objSize
-	}
-}
-
 func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
 	p []pprof.MemProfileRecord, rate int64) error {
 	stc := pprof.HeapProfileConfig(rate)

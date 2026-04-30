@@ -1,16 +1,17 @@
-//go:build go1.23 && !go1.27
-// +build go1.23,!go1.27
+//go:build go1.27
+// +build go1.27
 
 package pprof
 
 import _ "unsafe"
 
 // MemProfileRecord mirrors internal/profilerecord.MemProfileRecord layout
-// for Go 1.23 through 1.26. The runtime writes into these via //go:linkname
-// to pprof_memProfileInternal, so the field layout MUST match the runtime's
-// definition exactly.
+// for Go 1.27+. The runtime CL "remove redundant fields from memory profile
+// records" replaced AllocBytes/FreeBytes with a single ObjectSize.
+// The runtime writes into these via //go:linkname to pprof_memProfileInternal,
+// so the field layout MUST match the runtime's definition exactly.
 type MemProfileRecord struct {
-	AllocBytes, FreeBytes     int64
+	ObjectSize                int64
 	AllocObjects, FreeObjects int64
 	Stack                     []uintptr
 }
@@ -27,16 +28,10 @@ func memRecordStack(r *MemProfileRecord) []uintptr     { return r.Stack }
 func blockRecordStack(r *BlockProfileRecord) []uintptr { return r.Stack }
 
 func memRecordIsFresh(r *MemProfileRecord) bool {
-	return r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0
+	return r.AllocObjects == 0 && r.FreeObjects == 0
 }
 
-func memRecordBlockSize(r *MemProfileRecord) int64 {
-	if r.AllocObjects > 0 {
-		return r.AllocBytes / r.AllocObjects
-	}
-
-	return 0
-}
+func memRecordBlockSize(r *MemProfileRecord) int64 { return r.ObjectSize }
 
 //go:linkname pprof_memProfileInternal runtime.pprof_memProfileInternal
 func pprof_memProfileInternal(p []MemProfileRecord, inuseZero bool) (n int, ok bool)

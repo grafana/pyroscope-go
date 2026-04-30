@@ -1,11 +1,9 @@
-//go:build !go1.23
-// +build !go1.23
+//go:build go1.27
+// +build go1.27
 
 package compat
 
 import (
-	"runtime"
-
 	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
@@ -15,16 +13,16 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []pprof.MemProf
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
 		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
-		r := runtime.MemProfileRecord{
-			AllocObjects: int64(nobj),
-			AllocBytes:   int64(nobj * 1024),
-			FreeObjects:  int64(nobj), // pretend inuse is zero
-			FreeBytes:    int64(nobj * 1024),
-		}
+		stack := make([]uintptr, depth)
 		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
+			stack[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
 		}
-		records = append(records, r)
+		records = append(records, pprof.MemProfileRecord{
+			ObjectSize:   1024,
+			AllocObjects: int64(nobj),
+			FreeObjects:  int64(nobj), // pretend inuse is zero
+			Stack:        stack,
+		})
 	}
 
 	return records
@@ -35,47 +33,66 @@ func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []pprof.Bloc
 	fs := getFunctionPointers()
 	for i := 0; i < n; i++ {
 		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
-		r := runtime.BlockProfileRecord{
+		stack := make([]uintptr, depth)
+		for j := 0; j < depth; j++ {
+			stack[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
+		}
+		records = append(records, pprof.BlockProfileRecord{
 			Count:  int64(nobj),
 			Cycles: int64(nobj * 10),
-		}
-		for j := 0; j < depth; j++ {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
-		}
-		records = append(records, r)
+			Stack:  stack,
+		})
 	}
 
 	return records
 }
 
+// stackFromArray copies the prefix of s up to the first zero entry into a
+// fresh slice — matching runtime.MemProfileRecord.Stack0 -> Stack() behavior.
+func stackFromArray(s [32]uintptr) []uintptr {
+	for i, v := range s {
+		if v == 0 {
+			out := make([]uintptr, i)
+			copy(out, s[:i])
+
+			return out
+		}
+	}
+	out := make([]uintptr, len(s))
+	copy(out, s[:])
+
+	return out
+}
+
 func (h *mutexTestHelper) r(count, cycles int64, s [32]uintptr) pprof.BlockProfileRecord {
-	return runtime.BlockProfileRecord{
+	return pprof.BlockProfileRecord{
 		Count:  count,
 		Cycles: cycles,
-		StackRecord: runtime.StackRecord{
-			Stack0: s,
-		},
+		Stack:  stackFromArray(s),
 	}
 }
 
 func (h *heapTestHelper) r(allocObjects, allocBytes, freeObjects, freeBytes int64,
 	s [32]uintptr) pprof.MemProfileRecord {
-	return runtime.MemProfileRecord{
+	var size int64
+	switch {
+	case allocObjects > 0:
+		size = allocBytes / allocObjects
+	case freeObjects > 0:
+		size = freeBytes / freeObjects
+	}
+	return pprof.MemProfileRecord{
+		ObjectSize:   size,
 		AllocObjects: allocObjects,
-		AllocBytes:   allocBytes,
-		FreeBytes:    freeBytes,
 		FreeObjects:  freeObjects,
-		Stack0:       s,
+		Stack:        stackFromArray(s),
 	}
 }
 
 func (h *heapTestHelper) mutate(nmutations int, fs []pprof.MemProfileRecord) {
-	objSize := fs[0].AllocBytes / fs[0].AllocObjects
 	for j := 0; j < nmutations; j++ {
 		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
 		fs[idx].AllocObjects += 1
-		fs[idx].AllocBytes += objSize
 		fs[idx].FreeObjects += 1
-		fs[idx].FreeBytes += objSize
 	}
 }

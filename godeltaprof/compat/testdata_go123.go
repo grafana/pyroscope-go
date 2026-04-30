@@ -1,5 +1,5 @@
-//go:build go1.23
-// +build go1.23
+//go:build go1.23 && !go1.27
+// +build go1.23,!go1.27
 
 package compat
 
@@ -7,7 +7,6 @@ import (
 	"github.com/grafana/pyroscope-go/godeltaprof/internal/pprof"
 )
 
-//nolint:unparam
 func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []pprof.MemProfileRecord {
 	var records []pprof.MemProfileRecord
 
@@ -30,7 +29,6 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []pprof.MemProf
 	return records
 }
 
-//nolint:unparam
 func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []pprof.BlockProfileRecord {
 	var records []pprof.BlockProfileRecord
 	fs := getFunctionPointers()
@@ -58,11 +56,13 @@ func stackFromArray(s [32]uintptr) []uintptr {
 		if v == 0 {
 			out := make([]uintptr, i)
 			copy(out, s[:i])
+
 			return out
 		}
 	}
 	out := make([]uintptr, len(s))
 	copy(out, s[:])
+
 	return out
 }
 
@@ -82,5 +82,16 @@ func (h *heapTestHelper) r(allocObjects, allocBytes, freeObjects, freeBytes int6
 		FreeBytes:    freeBytes,
 		FreeObjects:  freeObjects,
 		Stack:        stackFromArray(s),
+	}
+}
+
+func (h *heapTestHelper) mutate(nmutations int, fs []pprof.MemProfileRecord) {
+	objSize := fs[0].AllocBytes / fs[0].AllocObjects
+	for j := 0; j < nmutations; j++ {
+		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
+		fs[idx].AllocObjects += 1
+		fs[idx].AllocBytes += objSize
+		fs[idx].FreeObjects += 1
+		fs[idx].FreeBytes += objSize
 	}
 }

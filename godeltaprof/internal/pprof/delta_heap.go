@@ -29,14 +29,11 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []MemProfileRecor
 	// deduplicate: accumulate allocObjects and inuseObjects in entry.acc for equal stacks
 	for i := range p {
 		r := &p[i]
-		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
+		if memRecordIsFresh(r) {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
 			continue
 		}
-		var blockSize int64
-		if r.AllocObjects > 0 {
-			blockSize = r.AllocBytes / r.AllocObjects
-		}
+		blockSize := memRecordBlockSize(r)
 		entry := d.m.Lookup(memRecordStack(r), uintptr(blockSize))
 		entry.acc.allocObjects += r.AllocObjects
 		entry.acc.inuseObjects += r.InUseObjects()
@@ -44,14 +41,11 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []MemProfileRecor
 	// do the delta using the accumulated values and previous values
 	for i := range p {
 		r := &p[i]
-		if r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0 {
+		if memRecordIsFresh(r) {
 			// it is a fresh bucket and it will be published after next 1-2 gc cycles
 			continue
 		}
-		var blockSize int64
-		if r.AllocObjects > 0 {
-			blockSize = r.AllocBytes / r.AllocObjects
-		}
+		blockSize := memRecordBlockSize(r)
 		entry := d.m.Lookup(memRecordStack(r), uintptr(blockSize))
 		if entry.acc == (heapAccValue{}) {
 			continue

@@ -11,6 +11,18 @@ type BlockProfileRecord = runtime.BlockProfileRecord
 func memRecordStack(r *MemProfileRecord) []uintptr     { return r.Stack() }
 func blockRecordStack(r *BlockProfileRecord) []uintptr { return r.Stack() }
 
+func memRecordIsFresh(r *MemProfileRecord) bool {
+	return r.AllocBytes == 0 && r.AllocObjects == 0 && r.FreeObjects == 0 && r.FreeBytes == 0
+}
+
+func memRecordBlockSize(r *MemProfileRecord) int64 {
+	if r.AllocObjects > 0 {
+		return r.AllocBytes / r.AllocObjects
+	}
+
+	return 0
+}
+
 func MemProfile(inuseZero bool) []MemProfileRecord {
 	var p []MemProfileRecord
 	n, _ := runtime.MemProfile(nil, inuseZero)

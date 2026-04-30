@@ -21,6 +21,7 @@ import (
 func deepRecurse(depth int, fn func()) {
 	if depth <= 1 {
 		fn()
+
 		return
 	}
 	deepRecurse(depth-1, fn)
