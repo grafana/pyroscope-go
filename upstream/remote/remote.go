@@ -111,7 +111,7 @@ func NewRemote(cfg Config) (*Remote, error) {
 
 func (r *Remote) Start() {
 	r.wg.Add(r.cfg.Threads)
-	for i := 0; i < r.cfg.Threads; i++ {
+	for range r.cfg.Threads {
 		go r.handleJobs()
 	}
 }

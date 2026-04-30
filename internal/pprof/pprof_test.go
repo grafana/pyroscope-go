@@ -7,7 +7,7 @@ import (
 )
 
 func Test_SetCollector(t *testing.T) {
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		_ = StartCPUProfile(io.Discard)
 		// SetCollector blocks until StopCPUProfile is called.
 		done := make(chan struct{})

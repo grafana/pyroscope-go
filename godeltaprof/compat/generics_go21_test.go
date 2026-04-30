@@ -1,6 +1,3 @@
-//go:build go1.21
-// +build go1.21
-
 //nolint:gochecknoglobals,lll
 package compat
 
@@ -27,7 +24,7 @@ func genericAllocFunc[T any](n int) []T {
 }
 
 func genericBlock[T any](n int) {
-	for i := 0; i < n; i++ {
+	for range n {
 		m.Lock()
 		time.Sleep(100 * time.Millisecond)
 		m.Unlock()
@@ -40,7 +37,7 @@ func triggerGenericBlock() {
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
-	for j := 0; j < workers; j++ {
+	for range workers {
 		go func() {
 			genericBlock[int](iters)
 			wg.Done()
@@ -49,7 +46,7 @@ func triggerGenericBlock() {
 	wg.Wait()
 }
 
-// TestGenerics tests that post go1.21 we emmit [...] as generics by default and [go.shape.int] if enabled
+// TestGenericsShape tests that we emit [...] as generics by default and [go.shape.int] if enabled.
 func TestGenericsShape(t *testing.T) {
 	var buffer *bytes.Buffer
 	var err error

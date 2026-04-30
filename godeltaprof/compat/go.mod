@@ -1,6 +1,6 @@
 module github.com/grafana/pyroscope-go/godeltaprof/compat
 
-go 1.18
+go 1.24.0
 
 require (
 	github.com/google/pprof v0.0.0-20231127191134-f3a68a39ae15

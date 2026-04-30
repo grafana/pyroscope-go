@@ -99,7 +99,7 @@ func TestDeltaHeap(t *testing.T) {
 	expectStackFrames(t, p2, stack0Marker, 10, 3525422, 10, 3525422)
 	expectStackFrames(t, p2, stack1Marker, 6, 2115253, 0, 0)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		// if we write same data, stack0 is in use, stack1 should not be present
 		p3 := h.dump(
 			h.r(5, 5*testObjectSize, 0, 0, stack0),
@@ -154,7 +154,7 @@ func TestDeltaBlockProfile(t *testing.T) {
 			expectStackFrames(t, p2, stack0Marker, count0, nanos0)
 			expectNoStackFrames(t, p2, stack1Marker)
 
-			for j := 0; j < 2; j++ {
+			for range 2 {
 				p3 := h.dump(
 					h.r(239, 239*cycles, stack0),
 					h.r(0, 0, stack1),
@@ -180,7 +180,7 @@ func BenchmarkHeapDelta(b *testing.B) {
 	nmutations := int(h.rng.Int63() % int64(len(fs)))
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		if i == 1000 {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
@@ -212,7 +212,7 @@ func BenchmarkMutexDelta(b *testing.B) {
 			nmutations := int(h.rng.Int63() % int64(len(fs)))
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for i := range b.N {
 				if i == 1000 {
 					v := h.rng.Int63()
 					if v != 7817861117094116717 {

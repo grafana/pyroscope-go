@@ -14,7 +14,7 @@ func BenchmarkKey_Parse(b *testing.B) {
 
 	// Duplicates are okay.
 	labels := make(map[string]string, labelsSize+1)
-	for i := 0; i < labelsSize; i++ {
+	for range labelsSize {
 		labels[randString(randInt(minLen, maxLen))] = randString(randInt(minLen, maxLen))
 	}
 
@@ -24,7 +24,7 @@ func BenchmarkKey_Parse(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if _, err := Parse(keyStr); err != nil {
 			b.Fatal(err)
 		}
