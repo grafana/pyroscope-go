@@ -52,7 +52,7 @@ jobs:
         run: make go/mod && git diff --exit-code
 
       - name: Run k6 go/mod
-        run: cd x/k6 && make go/mod && git diff --exit-code
+        run: make k6/go/mod && git diff --exit-code
 
       - name: Install Go stable
         if: matrix.go == 'tip'
@@ -84,5 +84,4 @@ jobs:
         run: |
           which go
           go version
-          cd x/k6
-          make test
+          make k6/test
