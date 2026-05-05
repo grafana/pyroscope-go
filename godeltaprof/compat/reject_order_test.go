@@ -44,7 +44,7 @@ func BenchmarkHeapRejectOrder(b *testing.B) {
 	h := newHeapTestHelper()
 	fs := h.generateMemProfileRecords(512, 32)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		err := WriteHeapProto(h.dp, h.opt, io.Discard, fs, int64(runtime.MemProfileRate))
 		if err != nil {
 			b.Fatal(err)
@@ -109,7 +109,7 @@ func BenchmarkMutexRejectOrder(b *testing.B) {
 			fs := h.generateBlockProfileRecords(512, 32)
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				err := PrintCountCycleProfile(h.dp, h.opt, io.Discard, scaler, fs)
 				if err != nil {
 					b.Fatal(err)

@@ -39,9 +39,9 @@ func TestScaleMutex(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
-	for j := 0; j < workers; j++ {
+	for range workers {
 		go func() {
-			for i := 0; i < iters; i++ {
+			for range iters {
 				m.Lock()
 				time.Sleep(time.Millisecond)
 				m.Unlock()
@@ -84,9 +84,9 @@ func TestScaleBlock(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
-	for j := 0; j < workers; j++ {
+	for range workers {
 		go func() {
-			for i := 0; i < iters; i++ {
+			for range iters {
 				m.Lock()
 				time.Sleep(time.Millisecond)
 				m.Unlock()
@@ -138,7 +138,7 @@ func TestScaleHeap(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime.MemProfileRate = 1
-	for i := 0; i < iters; i++ {
+	for range iters {
 		appendBuf(size)
 	}
 

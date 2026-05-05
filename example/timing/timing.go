@@ -330,7 +330,7 @@ func main() {
 
 	startTime := time.Now()
 	base := rand.Int63n(1000000) + 1 //nolint:gosec
-	for i := int64(0); i < 40000000; i++ {
+	for i := range int64(40000000) {
 		secs := int64(time.Since(startTime) / time.Second)
 		if secs > 15 {
 			break
