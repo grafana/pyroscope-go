@@ -1,10 +1,12 @@
 module github.com/grafana/pyroscope-go/godeltaprof/compat
 
-go 1.18
+go 1.24.0
+
+replace github.com/grafana/pyroscope-go/godeltaprof => ../
 
 require (
 	github.com/google/pprof v0.0.0-20231127191134-f3a68a39ae15
-	github.com/grafana/pyroscope-go/godeltaprof v0.1.5
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.9
 	github.com/klauspost/compress v1.17.8
 	github.com/stretchr/testify v1.11.1
 )

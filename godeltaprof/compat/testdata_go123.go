@@ -8,13 +8,13 @@ import (
 )
 
 func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []pprof.MemProfileRecord {
-	var records []pprof.MemProfileRecord
+	records := make([]pprof.MemProfileRecord, 0, n)
 
 	fs := getFunctionPointers()
-	for i := 0; i < n; i++ {
+	for range n {
 		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
 		stack := make([]uintptr, depth)
-		for j := 0; j < depth; j++ {
+		for j := range depth {
 			stack[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
 		}
 		records = append(records, pprof.MemProfileRecord{
@@ -30,12 +30,12 @@ func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []pprof.MemProf
 }
 
 func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []pprof.BlockProfileRecord {
-	var records []pprof.BlockProfileRecord
+	records := make([]pprof.BlockProfileRecord, 0, n)
 	fs := getFunctionPointers()
-	for i := 0; i < n; i++ {
+	for range n {
 		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
 		stack := make([]uintptr, depth)
-		for j := 0; j < depth; j++ {
+		for j := range depth {
 			stack[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
 		}
 		records = append(records, pprof.BlockProfileRecord{
@@ -87,7 +87,7 @@ func (h *heapTestHelper) r(allocObjects, allocBytes, freeObjects, freeBytes int6
 
 func (h *heapTestHelper) mutate(nmutations int, fs []pprof.MemProfileRecord) {
 	objSize := fs[0].AllocBytes / fs[0].AllocObjects
-	for j := 0; j < nmutations; j++ {
+	for range nmutations {
 		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
 		fs[idx].AllocObjects += 1
 		fs[idx].AllocBytes += objSize

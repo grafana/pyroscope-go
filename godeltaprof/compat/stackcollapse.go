@@ -114,7 +114,7 @@ func stackCollapseProfile(p *gprofile.Profile) []stack {
 			continue
 		}
 		if unique[len(unique)-1].line == s.line {
-			for i := 0; i < len(s.value); i++ {
+			for i := range s.value {
 				unique[len(unique)-1].value[i] += s.value[i]
 			}
 
@@ -142,7 +142,7 @@ func pprofSampleStackToStrings(s *gprofile.Sample) ([]string, string) {
 			funcs = append(funcs, f.Name)
 		}
 	}
-	for i := 0; i < len(funcs)/2; i++ {
+	for i := range len(funcs) / 2 {
 		j := len(funcs) - i - 1
 		funcs[i], funcs[j] = funcs[j], funcs[i]
 	}

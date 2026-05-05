@@ -74,7 +74,7 @@ func (d *DeltaHeapProfiler) WriteHeapProto(b ProfileBuilder, p []MemProfileRecor
 		}
 
 		hideRuntime := true
-		for tries := 0; tries < 2; tries++ {
+		for range 2 {
 			stk := memRecordStack(r)
 			// For heap profiles, all stack
 			// addresses are return PCs, which is

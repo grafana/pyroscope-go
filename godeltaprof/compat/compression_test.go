@@ -18,7 +18,7 @@ func BenchmarkHeapCompression(b *testing.B) {
 	nmutations := int(h.rng.Int63() % int64(len(fs)))
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		if i == 1000 {
 			v := h.rng.Int63()
 			if v != 7817861117094116717 {
@@ -49,7 +49,7 @@ func BenchmarkMutexCompression(b *testing.B) {
 			nmutations := int(h.rng.Int63() % int64(len(fs)))
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for i := range b.N {
 				if i == 1000 {
 					v := h.rng.Int63()
 					if v != 7817861117094116717 {

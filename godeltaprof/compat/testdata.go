@@ -207,7 +207,7 @@ func (h *mutexTestHelper) dump(r ...pprof.BlockProfileRecord) *bytes.Buffer {
 
 func (h *mutexTestHelper) mutate(nmutations int, fs []pprof.BlockProfileRecord) {
 	oneBlockCycles := fs[0].Cycles / fs[0].Count
-	for j := 0; j < nmutations; j++ {
+	for range nmutations {
 		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
 		fs[idx].Count += 1
 		fs[idx].Cycles += oneBlockCycles
