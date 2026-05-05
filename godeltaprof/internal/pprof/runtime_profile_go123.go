@@ -1,5 +1,5 @@
-//go:build go1.23 && !go1.27
-// +build go1.23,!go1.27
+//go:build !go1.27
+// +build !go1.27
 
 package pprof
 
