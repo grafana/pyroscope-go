@@ -6,7 +6,7 @@ go 1.24.0
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
 require (
-	github.com/grafana/pyroscope-go/godeltaprof v0.1.9
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.10
 	github.com/stretchr/testify v1.11.1
 )
 
