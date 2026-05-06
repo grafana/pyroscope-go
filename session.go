@@ -32,9 +32,10 @@ type Session struct {
 	// these things do change:
 	memBuf *bytes.Buffer
 
-	goroutinesBuf *bytes.Buffer
-	mutexBuf      *bytes.Buffer
-	blockBuf      *bytes.Buffer
+	goroutinesBuf     *bytes.Buffer
+	goroutineLeakBuf  *bytes.Buffer
+	mutexBuf          *bytes.Buffer
+	blockBuf          *bytes.Buffer
 
 	lastGCGeneration uint32
 	appName          string
@@ -93,6 +94,19 @@ func NewSession(c SessionConfig) (*Session, error) {
 		return nil, err
 	}
 
+	// Warn if goroutine leak profiling is requested but not available.
+	// The goroutineleak profile requires Go 1.26+ with GOEXPERIMENT=goroutineleakprofile.
+	for _, pt := range c.ProfilingTypes {
+		if pt == ProfileGoroutineLeak {
+			if pprof.Lookup("goroutineleak") == nil {
+				c.Logger.Infof("goroutine leak profiling requested but not available: " +
+					"build with GOEXPERIMENT=goroutineleakprofile (requires Go 1.26+)")
+			}
+
+			break
+		}
+	}
+
 	ps := &Session{
 		upstream:      c.Upstream,
 		appName:       appName,
@@ -102,10 +116,11 @@ func NewSession(c SessionConfig) (*Session, error) {
 		stopCh:        make(chan struct{}),
 		flushCh:       make(chan *flush),
 		logger:        c.Logger,
-		memBuf:        &bytes.Buffer{},
-		goroutinesBuf: &bytes.Buffer{},
-		mutexBuf:      &bytes.Buffer{},
-		blockBuf:      &bytes.Buffer{},
+		memBuf:           &bytes.Buffer{},
+		goroutinesBuf:    &bytes.Buffer{},
+		goroutineLeakBuf: &bytes.Buffer{},
+		mutexBuf:         &bytes.Buffer{},
+		blockBuf:         &bytes.Buffer{},
 
 		deltaBlock: godeltaprof.NewBlockProfiler(),
 		deltaMutex: godeltaprof.NewMutexProfiler(),
@@ -249,6 +264,16 @@ func (ps *Session) isGoroutinesEnabled() bool {
 	return false
 }
 
+func (ps *Session) isGoroutineLeakEnabled() bool {
+	for _, t := range ps.profileTypes {
+		if t == ProfileGoroutineLeak {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (ps *Session) reset(startTime, endTime time.Time) {
 	ps.logger.Debugf("profiling session reset %s", startTime.String())
 	// first reset should not result in an upload
@@ -286,6 +311,30 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 				},
 			})
 			ps.goroutinesBuf.Reset()
+		}
+	}
+
+	if ps.isGoroutineLeakEnabled() {
+		p := pprof.Lookup("goroutineleak")
+		if p != nil {
+			err := p.WriteTo(ps.goroutineLeakBuf, 0)
+			if err != nil {
+				ps.logger.Errorf("failed to dump goroutine leak profile: %s", err)
+
+				return
+			}
+			ps.upstream.Upload(&upstream.UploadJob{
+				Name:            ps.appName,
+				StartTime:       startTime,
+				EndTime:         endTime,
+				SpyName:         "gospy",
+				Units:           "goroutines",
+				AggregationType: "average",
+				Format:          upstream.FormatPprof,
+				Profile:         copyBuf(ps.goroutineLeakBuf.Bytes()),
+				SampleTypeConfig: sampleTypeConfigGoroutineLeak,
+			})
+			ps.goroutineLeakBuf.Reset()
 		}
 	}
 

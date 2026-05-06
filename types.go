@@ -22,6 +22,7 @@ const (
 	ProfileMutexDuration ProfileType = "mutex_duration"
 	ProfileBlockCount    ProfileType = "block_count"
 	ProfileBlockDuration ProfileType = "block_duration"
+	ProfileGoroutineLeak ProfileType = "goroutine_leak"
 	DefaultSampleRate                = 100
 )
 
