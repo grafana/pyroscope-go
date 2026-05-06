@@ -160,47 +160,6 @@ func getFunctionPointers() []uintptr {
 	}
 }
 
-//nolint:unparam
-func (h *heapTestHelper) generateMemProfileRecords(n, depth int) []runtime.MemProfileRecord {
-	records := make([]runtime.MemProfileRecord, 0, n)
-
-	fs := getFunctionPointers()
-	for range n {
-		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
-		r := runtime.MemProfileRecord{
-			AllocObjects: int64(nobj),
-			AllocBytes:   int64(nobj * 1024),
-			FreeObjects:  int64(nobj), // pretend inuse is zero
-			FreeBytes:    int64(nobj * 1024),
-		}
-		for j := range depth {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
-		}
-		records = append(records, r)
-	}
-
-	return records
-}
-
-//nolint:unparam
-func (h *mutexTestHelper) generateBlockProfileRecords(n, depth int) []runtime.BlockProfileRecord {
-	records := make([]runtime.BlockProfileRecord, 0, n)
-	fs := getFunctionPointers()
-	for range n {
-		nobj := int(uint64(h.rng.Int63())) % 1000000 //nolint:gosec
-		r := runtime.BlockProfileRecord{
-			Count:  int64(nobj),
-			Cycles: int64(nobj * 10),
-		}
-		for j := range depth {
-			r.Stack0[j] = fs[int(uint64(h.rng.Int63()))%len(fs)] //nolint:gosec
-		}
-		records = append(records, r)
-	}
-
-	return records
-}
-
 type mutexTestHelper struct {
 	dp     *pprof.DeltaMutexProfiler
 	opt    *pprof.ProfileBuilderOptions
@@ -236,7 +195,7 @@ func (h *mutexTestHelper) scale2(rcount, rcycles int64) []int64 {
 	return []int64{c, n}
 }
 
-func (h *mutexTestHelper) dump(r ...runtime.BlockProfileRecord) *bytes.Buffer {
+func (h *mutexTestHelper) dump(r ...pprof.BlockProfileRecord) *bytes.Buffer {
 	buf := bytes.NewBuffer(nil)
 	err := PrintCountCycleProfile(h.dp, h.opt, buf, h.scaler, r)
 	if err != nil { // never happens
@@ -246,17 +205,7 @@ func (h *mutexTestHelper) dump(r ...runtime.BlockProfileRecord) *bytes.Buffer {
 	return buf
 }
 
-func (h *mutexTestHelper) r(count, cycles int64, s [32]uintptr) runtime.BlockProfileRecord {
-	return runtime.BlockProfileRecord{
-		Count:  count,
-		Cycles: cycles,
-		StackRecord: runtime.StackRecord{
-			Stack0: s,
-		},
-	}
-}
-
-func (h *mutexTestHelper) mutate(nmutations int, fs []runtime.BlockProfileRecord) {
+func (h *mutexTestHelper) mutate(nmutations int, fs []pprof.BlockProfileRecord) {
 	oneBlockCycles := fs[0].Cycles / fs[0].Count
 	for range nmutations {
 		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
@@ -286,7 +235,7 @@ func newHeapTestHelper() *heapTestHelper {
 	return res
 }
 
-func (h *heapTestHelper) dump(r ...runtime.MemProfileRecord) *bytes.Buffer {
+func (h *heapTestHelper) dump(r ...pprof.MemProfileRecord) *bytes.Buffer {
 	buf := bytes.NewBuffer(nil)
 	err := WriteHeapProto(h.dp, h.opt, buf, r, h.rate)
 	if err != nil { // never happens
@@ -296,30 +245,8 @@ func (h *heapTestHelper) dump(r ...runtime.MemProfileRecord) *bytes.Buffer {
 	return buf
 }
 
-func (h *heapTestHelper) r(allocObjects, allocBytes, freeObjects, freeBytes int64,
-	s [32]uintptr) runtime.MemProfileRecord {
-	return runtime.MemProfileRecord{
-		AllocObjects: allocObjects,
-		AllocBytes:   allocBytes,
-		FreeBytes:    freeBytes,
-		FreeObjects:  freeObjects,
-		Stack0:       s,
-	}
-}
-
-func (h *heapTestHelper) mutate(nmutations int, fs []runtime.MemProfileRecord) {
-	objSize := fs[0].AllocBytes / fs[0].AllocObjects
-	for range nmutations {
-		idx := int(uint(h.rng.Int63())) % len(fs) //nolint:gosec
-		fs[idx].AllocObjects += 1
-		fs[idx].AllocBytes += objSize
-		fs[idx].FreeObjects += 1
-		fs[idx].FreeBytes += objSize
-	}
-}
-
 func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
-	p []runtime.MemProfileRecord, rate int64) error {
+	p []pprof.MemProfileRecord, rate int64) error {
 	stc := pprof.HeapProfileConfig(rate)
 	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	b := pprof.NewProfileBuilder(w, zw, opt, stc)
@@ -328,7 +255,7 @@ func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOption
 }
 
 func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
-	scaler pprof.MutexProfileScaler, records []runtime.BlockProfileRecord) error {
+	scaler pprof.MutexProfileScaler, records []pprof.BlockProfileRecord) error {
 	stc := pprof.MutexProfileConfig()
 	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	b := pprof.NewProfileBuilder(w, zw, opt, stc)
