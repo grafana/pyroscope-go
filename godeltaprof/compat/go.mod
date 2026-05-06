@@ -7,7 +7,7 @@ replace github.com/grafana/pyroscope-go/godeltaprof => ../
 require (
 	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.10
-	github.com/klauspost/compress v1.17.8
+	github.com/klauspost/compress v1.18.6
 	github.com/stretchr/testify v1.11.1
 )
 
