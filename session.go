@@ -32,10 +32,10 @@ type Session struct {
 	// these things do change:
 	memBuf *bytes.Buffer
 
-	goroutinesBuf     *bytes.Buffer
-	goroutineLeakBuf  *bytes.Buffer
-	mutexBuf          *bytes.Buffer
-	blockBuf          *bytes.Buffer
+	goroutinesBuf    *bytes.Buffer
+	goroutineLeakBuf *bytes.Buffer
+	mutexBuf         *bytes.Buffer
+	blockBuf         *bytes.Buffer
 
 	lastGCGeneration uint32
 	appName          string
@@ -108,14 +108,14 @@ func NewSession(c SessionConfig) (*Session, error) {
 	}
 
 	ps := &Session{
-		upstream:      c.Upstream,
-		appName:       appName,
-		profileTypes:  c.ProfilingTypes,
-		disableGCRuns: c.DisableGCRuns,
-		uploadRate:    c.UploadRate,
-		stopCh:        make(chan struct{}),
-		flushCh:       make(chan *flush),
-		logger:        c.Logger,
+		upstream:         c.Upstream,
+		appName:          appName,
+		profileTypes:     c.ProfilingTypes,
+		disableGCRuns:    c.DisableGCRuns,
+		uploadRate:       c.UploadRate,
+		stopCh:           make(chan struct{}),
+		flushCh:          make(chan *flush),
+		logger:           c.Logger,
 		memBuf:           &bytes.Buffer{},
 		goroutinesBuf:    &bytes.Buffer{},
 		goroutineLeakBuf: &bytes.Buffer{},
@@ -324,14 +324,14 @@ func (ps *Session) uploadData(startTime, endTime time.Time) {
 				return
 			}
 			ps.upstream.Upload(&upstream.UploadJob{
-				Name:            ps.appName,
-				StartTime:       startTime,
-				EndTime:         endTime,
-				SpyName:         "gospy",
-				Units:           "goroutines",
-				AggregationType: "average",
-				Format:          upstream.FormatPprof,
-				Profile:         copyBuf(ps.goroutineLeakBuf.Bytes()),
+				Name:             ps.appName,
+				StartTime:        startTime,
+				EndTime:          endTime,
+				SpyName:          "gospy",
+				Units:            "goroutines",
+				AggregationType:  "average",
+				Format:           upstream.FormatPprof,
+				Profile:          copyBuf(ps.goroutineLeakBuf.Bytes()),
 				SampleTypeConfig: sampleTypeConfigGoroutineLeak,
 			})
 			ps.goroutineLeakBuf.Reset()
