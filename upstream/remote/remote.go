@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -13,23 +12,16 @@ import (
 	"path"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/grafana/pyroscope-go/upstream"
 )
 
-var errCloudTokenRequired = errors.New("please provide an authentication token." +
-	" You can find it here: https://pyroscope.io/cloud")
-
-const (
-	authTokenDeprecationWarning = "Authtoken is specified, but deprecated and ignored. " +
-		"Please switch to BasicAuthUser and BasicAuthPassword. " +
-		"If you need to use Bearer token authentication for a custom setup, " +
-		"you can use the HTTPHeaders option to set the Authorization header manually."
-	cloudHostnameSuffix = "pyroscope.cloud"
-)
+const authTokenDeprecationWarning = "Authtoken is specified, but deprecated and ignored. " +
+	"Please switch to BasicAuthUser and BasicAuthPassword. " +
+	"If you need to use Bearer token authentication for a custom setup, " +
+	"you can use the HTTPHeaders option to set the Authorization header manually."
 
 type Remote struct {
 	mu     sync.Mutex
@@ -93,17 +85,6 @@ func NewRemote(cfg Config) (*Remote, error) {
 	}
 	if cfg.HTTPClient != nil {
 		r.client = cfg.HTTPClient
-	}
-
-	// parse the upstream address
-	u, err := url.Parse(cfg.Address)
-	if err != nil {
-		return nil, err
-	}
-
-	// authorize the token first
-	if cfg.AuthToken == "" && isOGPyroscopeCloud(u) {
-		return nil, errCloudTokenRequired
 	}
 
 	return r, nil
@@ -202,8 +183,6 @@ func (r *Remote) uploadProfile(j *upstream.UploadJob) error {
 	// request.Header.Set("Content-Type", "binary/octet-stream+"+string(j.Format))
 
 	switch {
-	case r.cfg.AuthToken != "" && isOGPyroscopeCloud(u):
-		request.Header.Set("Authorization", "Bearer "+r.cfg.AuthToken)
 	case r.cfg.BasicAuthUser != "" && r.cfg.BasicAuthPassword != "":
 		request.SetBasicAuth(r.cfg.BasicAuthUser, r.cfg.BasicAuthPassword)
 	case r.cfg.AuthToken != "":
@@ -253,10 +232,6 @@ func (r *Remote) handleJobs() {
 			j.flush.Done()
 		}
 	}
-}
-
-func isOGPyroscopeCloud(u *url.URL) bool {
-	return strings.HasSuffix(u.Host, cloudHostnameSuffix)
 }
 
 // do safe upload

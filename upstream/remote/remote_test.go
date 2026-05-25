@@ -27,13 +27,13 @@ func TestUploadProfile(t *testing.T) {
 		expectWarning      bool
 	}{
 		{
-			name: "OG Pyroscope Cloud with AuthToken",
+			name: "AuthToken sets Bearer header with deprecation warning",
 			cfg: Config{
 				AuthToken: "test-token",
-				Address:   "https://example.pyroscope.cloud",
+				Address:   "https://example.com",
 			},
 			expectedAuthHeader: "Bearer test-token",
-			expectWarning:      false,
+			expectWarning:      true,
 		},
 		{
 			name: "Non-OG Server with BasicAuth",
