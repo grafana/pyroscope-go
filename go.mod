@@ -1,6 +1,8 @@
 module github.com/grafana/pyroscope-go
 
-go 1.24.0
+go 1.25.0
+
+toolchain go1.25.10
 
 // todo can we remove this replace?
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
