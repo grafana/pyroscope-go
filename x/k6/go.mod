@@ -2,6 +2,8 @@ module github.com/grafana/pyroscope-go/x/k6
 
 go 1.25.0
 
+toolchain go1.25.10
+
 replace github.com/grafana/pyroscope-go => ../../
 
 require (
@@ -14,7 +16,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/grafana/pyroscope-go/godeltaprof v0.1.10 // indirect
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.11 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
