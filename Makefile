@@ -6,7 +6,7 @@ GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
 
 .PHONY: test
 test:
-	$(GO) test -race $(shell $(GO) list ./... | grep -v /example)
+	$(GO) test -race $(shell $(GO) list ./...)
 	cd godeltaprof && $(GO) test -race ./...
 	cd godeltaprof/compat && $(GO) test -race ./...
 
@@ -18,8 +18,7 @@ go/mod:
 	cd godeltaprof/compat/ && GO111MODULE=on go mod tidy
 	cd godeltaprof/ && GO111MODULE=on go mod download
 	cd godeltaprof/ && GO111MODULE=on go mod tidy
-	cd example/http/ && GO111MODULE=on go mod download
-	cd example/http/ && GO111MODULE=on go mod tidy
+
 
 .PHONY: k6/test
 k6/test:
@@ -41,8 +40,4 @@ lint: install-lint
 	cd godeltaprof && $(GOLANGCI_LINT) run
 	cd godeltaprof/compat && $(GOLANGCI_LINT) run
 
-.PHONY: examples
-examples:
-	 go build example/http/main.go
-	 go build example/simple/main.go
-	 go build example/timing/timing.go
+
