@@ -2,7 +2,7 @@ module http
 
 go 1.25.0
 
-toolchain go1.25.10
+toolchain go1.25.11
 
 require github.com/grafana/pyroscope-go v1.3.0
 
