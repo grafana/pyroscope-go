@@ -3,7 +3,6 @@ package semconv
 import (
 	"runtime"
 	"runtime/debug"
-	"sync"
 
 	"github.com/grafana/pyroscope-go/internal/labelset"
 )
@@ -18,11 +17,6 @@ const (
 	scopeGodeltaprof           = "com.grafana.pyroscope/godeltaprof"
 )
 
-var (
-	scopeVersions = versions{}
-	versionOnce   = sync.Once{}
-)
-
 type versions struct {
 	sdk         string
 	godeltaprof string
@@ -34,33 +28,32 @@ type AppNames struct {
 }
 
 func getScopeVersions() versions {
-	versionOnce.Do(func() {
-		var sdk = ""
-		var godeltaprof = ""
-		info, ok := debug.ReadBuildInfo()
-		if !ok {
-			return
+	var sdk = ""
+	var godeltaprof = ""
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return versions{}
+	}
+	for _, dep := range info.Deps {
+		switch dep.Path {
+		case "github.com/grafana/pyroscope-go/godeltaprof":
+			godeltaprof = dep.Version
+		case "github.com/grafana/pyroscope-go":
+			sdk = dep.Version
 		}
-		for _, dep := range info.Deps {
-			switch dep.Path {
-			case "github.com/grafana/pyroscope-go/godeltaprof":
-				godeltaprof = dep.Version
-			case "github.com/grafana/pyroscope-go":
-				sdk = dep.Version
-			}
-		}
-		scopeVersions = versions{
-			sdk:         sdk,
-			godeltaprof: godeltaprof,
-		}
-	})
-	return scopeVersions
+	}
+
+	return versions{
+		sdk:         sdk,
+		godeltaprof: godeltaprof,
+	}
 }
 
 func getRuntimeName() string {
 	if runtime.Compiler == "gc" {
 		return "go"
 	}
+
 	return runtime.Compiler
 }
 
@@ -98,6 +91,7 @@ func MergeTagsWithAppName(appName string, sid string, tags map[string]string) (A
 	k.Add(labelProcessRuntimeName, getRuntimeName())
 	k.Add(labelProcessRuntimeVersion, getRuntimeVersion())
 	vs := getScopeVersions()
+
 	return AppNames{
 		SDK:         buildAppName(k, scopeSDK, vs.sdk),
 		Godeltaprof: buildAppName(k, scopeGodeltaprof, vs.godeltaprof),
@@ -111,5 +105,6 @@ func buildAppName(builder *labelset.LabelSet, scope, version string) string {
 	} else {
 		builder.Add(labelScopeVersion, "") // delete
 	}
+
 	return builder.Normalized()
 }
