@@ -3,8 +3,9 @@ package semconv
 import (
 	"testing"
 
-	"github.com/grafana/pyroscope-go/internal/labelset"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/pyroscope-go/internal/labelset"
 )
 
 func TestMergeTagsWithAppName(t *testing.T) {
