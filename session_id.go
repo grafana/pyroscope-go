@@ -10,8 +10,6 @@ import (
 	"sync"
 )
 
-const sessionIDLabelName = "__session_id__"
-
 type sessionID uint64
 
 func (s sessionID) String() string {
