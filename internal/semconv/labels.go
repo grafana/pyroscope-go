@@ -88,8 +88,8 @@ func MergeTagsWithAppName(appName string, sid string, tags map[string]string) (A
 	}
 
 	k.Add(labelPyroscopeSessionID, sid)
-	k.Add(labelProcessRuntimeName, getRuntimeName())
-	k.Add(labelProcessRuntimeVersion, getRuntimeVersion())
+	addDefaultLabel(k, labelProcessRuntimeName, getRuntimeName())
+	addDefaultLabel(k, labelProcessRuntimeVersion, getRuntimeVersion())
 	vs := getScopeVersions()
 
 	return AppNames{
@@ -99,12 +99,19 @@ func MergeTagsWithAppName(appName string, sid string, tags map[string]string) (A
 }
 
 func buildAppName(builder *labelset.LabelSet, scope, version string) string {
-	builder.Add(labelScopeName, scope)
-	if version != "" {
-		builder.Add(labelScopeVersion, version)
-	} else {
-		builder.Add(labelScopeVersion, "") // delete
-	}
+	builder = builder.Clone()
+	addDefaultLabel(builder, labelScopeName, scope)
+	addDefaultLabel(builder, labelScopeVersion, version)
 
 	return builder.Normalized()
+}
+
+func addDefaultLabel(builder *labelset.LabelSet, key, value string) {
+	if value == "" {
+		return
+	}
+	if _, ok := builder.Labels()[key]; ok {
+		return
+	}
+	builder.Add(key, value)
 }
