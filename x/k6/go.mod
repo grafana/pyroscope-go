@@ -7,7 +7,7 @@ toolchain go1.25.11
 replace github.com/grafana/pyroscope-go => ../../
 
 require (
-	github.com/grafana/pyroscope-go v1.3.1
+	github.com/grafana/pyroscope-go v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.41.0
