@@ -7,7 +7,7 @@ toolchain go1.25.12
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
 require (
-	github.com/grafana/pyroscope-go/godeltaprof v0.1.11
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.12
 	github.com/stretchr/testify v1.11.1
 )
 
