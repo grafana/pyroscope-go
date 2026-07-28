@@ -10,7 +10,7 @@ require (
 	github.com/grafana/pyroscope-go v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/stretchr/testify v1.11.1
-	go.opentelemetry.io/otel v1.41.0
+	go.opentelemetry.io/otel v1.42.0
 	google.golang.org/grpc v1.80.0
 )
 
