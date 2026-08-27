@@ -27,7 +27,6 @@ type BlockProfiler struct {
 	impl           pprof.DeltaMutexProfiler
 	mutex          sync.Mutex
 	runtimeProfile func() []pprof.BlockProfileRecord
-	scaleProfile   pprof.MutexProfileScaler
 	options        pprof.ProfileBuilderOptions
 	gz             gz
 }
@@ -43,7 +42,6 @@ type BlockProfiler struct {
 func NewMutexProfiler() *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: pprof.MutexProfile,
-		scaleProfile:   pprof.ScalerMutexProfile,
 		impl:           pprof.DeltaMutexProfiler{},
 		options: pprof.ProfileBuilderOptions{
 			GenericsFrames: true,
@@ -55,7 +53,6 @@ func NewMutexProfiler() *BlockProfiler {
 func NewMutexProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: pprof.MutexProfile,
-		scaleProfile:   pprof.ScalerMutexProfile,
 		impl:           pprof.DeltaMutexProfiler{},
 		options: pprof.ProfileBuilderOptions{
 			GenericsFrames: options.GenericsFrames,
@@ -75,7 +72,6 @@ func NewMutexProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 func NewBlockProfiler() *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: pprof.BlockProfile,
-		scaleProfile:   pprof.ScalerBlockProfile,
 		impl:           pprof.DeltaMutexProfiler{},
 		options: pprof.ProfileBuilderOptions{
 			GenericsFrames: true,
@@ -87,7 +83,6 @@ func NewBlockProfiler() *BlockProfiler {
 func NewBlockProfilerWithOptions(options ProfileOptions) *BlockProfiler {
 	return &BlockProfiler{
 		runtimeProfile: pprof.BlockProfile,
-		scaleProfile:   pprof.ScalerBlockProfile,
 		impl:           pprof.DeltaMutexProfiler{},
 		options: pprof.ProfileBuilderOptions{
 			GenericsFrames: options.GenericsFrames,
@@ -108,5 +103,5 @@ func (d *BlockProfiler) Profile(w io.Writer) error {
 	stc := pprof.MutexProfileConfig()
 	b := pprof.NewProfileBuilder(w, zw, &d.options, stc)
 
-	return d.impl.PrintCountCycleProfile(b, d.scaleProfile, p)
+	return d.impl.PrintCountCycleProfile(b, p)
 }

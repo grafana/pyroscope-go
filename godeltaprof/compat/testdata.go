@@ -161,10 +161,9 @@ func getFunctionPointers() []uintptr {
 }
 
 type mutexTestHelper struct {
-	dp     *pprof.DeltaMutexProfiler
-	opt    *pprof.ProfileBuilderOptions
-	scaler pprof.MutexProfileScaler
-	rng    rand.Source
+	dp  *pprof.DeltaMutexProfiler
+	opt *pprof.ProfileBuilderOptions
+	rng rand.Source
 }
 
 func newMutexTestHelper() *mutexTestHelper {
@@ -174,8 +173,7 @@ func newMutexTestHelper() *mutexTestHelper {
 			GenericsFrames: true,
 			LazyMapping:    true,
 		},
-		scaler: pprof.ScalerMutexProfile,
-		rng:    rand.NewSource(239),
+		rng: rand.NewSource(239),
 	}
 
 	return res
@@ -183,10 +181,9 @@ func newMutexTestHelper() *mutexTestHelper {
 
 func (h *mutexTestHelper) scale(rcount, rcycles int64) (int64, int64) {
 	cpuGHz := float64(pprof.Runtime_cyclesPerSecond()) / 1e9
-	count, nanosec := pprof.ScaleMutexProfile(h.scaler, rcount, float64(rcycles)/cpuGHz)
-	inanosec := int64(nanosec)
+	inanosec := int64(float64(rcycles) / cpuGHz)
 
-	return count, inanosec
+	return rcount, inanosec
 }
 
 func (h *mutexTestHelper) scale2(rcount, rcycles int64) []int64 {
@@ -197,7 +194,7 @@ func (h *mutexTestHelper) scale2(rcount, rcycles int64) []int64 {
 
 func (h *mutexTestHelper) dump(r ...pprof.BlockProfileRecord) *bytes.Buffer {
 	buf := bytes.NewBuffer(nil)
-	err := PrintCountCycleProfile(h.dp, h.opt, buf, h.scaler, r)
+	err := PrintCountCycleProfile(h.dp, h.opt, buf, r)
 	if err != nil { // never happens
 		panic(err)
 	}
@@ -255,12 +252,12 @@ func WriteHeapProto(dp *pprof.DeltaHeapProfiler, opt *pprof.ProfileBuilderOption
 }
 
 func PrintCountCycleProfile(d *pprof.DeltaMutexProfiler, opt *pprof.ProfileBuilderOptions, w io.Writer,
-	scaler pprof.MutexProfileScaler, records []pprof.BlockProfileRecord) error {
+	records []pprof.BlockProfileRecord) error {
 	stc := pprof.MutexProfileConfig()
 	zw, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
 	b := pprof.NewProfileBuilder(w, zw, opt, stc)
 
-	return d.PrintCountCycleProfile(b, scaler, records)
+	return d.PrintCountCycleProfile(b, records)
 }
 
 type noopBuilder struct {
