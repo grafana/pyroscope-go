@@ -126,50 +126,41 @@ func TestDeltaHeap(t *testing.T) {
 }
 
 func TestDeltaBlockProfile(t *testing.T) {
-	for i, scaler := range mutexProfileScalers {
-		name := scalerMutexProfileName
-		if i == 1 {
-			name = scalerBlockProfileName
-		}
-		t.Run(name, func(t *testing.T) {
-			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
-			runtime.SetMutexProfileFraction(5)
-			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
+	prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
+	runtime.SetMutexProfileFraction(5)
+	defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			h := newMutexTestHelper()
-			h.scaler = scaler
+	h := newMutexTestHelper()
 
-			p1 := h.dump(
-				h.r(0, 0, stack0),
-				h.r(0, 0, stack1),
-			)
-			expectEmptyProfile(t, p1)
+	p1 := h.dump(
+		h.r(0, 0, stack0),
+		h.r(0, 0, stack1),
+	)
+	expectEmptyProfile(t, p1)
 
-			const cycles = 42
-			p2 := h.dump(
-				h.r(239, 239*cycles, stack0),
-				h.r(0, 0, stack1),
-			)
-			count0, nanos0 := h.scale(239, 239*cycles)
-			expectStackFrames(t, p2, stack0Marker, count0, nanos0)
-			expectNoStackFrames(t, p2, stack1Marker)
+	const cycles = 42
+	p2 := h.dump(
+		h.r(239, 239*cycles, stack0),
+		h.r(0, 0, stack1),
+	)
+	count0, nanos0 := h.scale(239, 239*cycles)
+	expectStackFrames(t, p2, stack0Marker, count0, nanos0)
+	expectNoStackFrames(t, p2, stack1Marker)
 
-			for range 2 {
-				p3 := h.dump(
-					h.r(239, 239*cycles, stack0),
-					h.r(0, 0, stack1),
-				)
-				expectEmptyProfile(t, p3)
-			}
-
-			count1, nanos1 := h.scale(240, 240*cycles)
-			p4 := h.dump(
-				h.r(240, 240*cycles, stack0),
-			)
-			expectStackFrames(t, p4, stack0Marker, count1-count0, nanos1-nanos0)
-			expectNoStackFrames(t, p4, stack1Marker)
-		})
+	for range 2 {
+		p3 := h.dump(
+			h.r(239, 239*cycles, stack0),
+			h.r(0, 0, stack1),
+		)
+		expectEmptyProfile(t, p3)
 	}
+
+	count1, nanos1 := h.scale(240, 240*cycles)
+	p4 := h.dump(
+		h.r(240, 240*cycles, stack0),
+	)
+	expectStackFrames(t, p4, stack0Marker, count1-count0, nanos1-nanos0)
+	expectNoStackFrames(t, p4, stack1Marker)
 }
 
 func BenchmarkHeapDelta(b *testing.B) {
@@ -194,36 +185,27 @@ func BenchmarkHeapDelta(b *testing.B) {
 }
 
 func BenchmarkMutexDelta(b *testing.B) {
-	for i, scaler := range mutexProfileScalers {
-		name := scalerMutexProfileName
-		if i == 1 {
-			name = scalerBlockProfileName
-		}
-		b.Run(name, func(b *testing.B) {
-			prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
-			runtime.SetMutexProfileFraction(5)
-			defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
+	prevMutexProfileFraction := runtime.SetMutexProfileFraction(-1)
+	runtime.SetMutexProfileFraction(5)
+	defer runtime.SetMutexProfileFraction(prevMutexProfileFraction)
 
-			h := newMutexTestHelper()
-			h.scaler = scaler
-			fs := h.generateBlockProfileRecords(512, 32)
-			builder := &noopBuilder{}
-			h.rng.Seed(239)
-			nmutations := int(h.rng.Int63() % int64(len(fs)))
-			b.ResetTimer()
+	h := newMutexTestHelper()
+	fs := h.generateBlockProfileRecords(512, 32)
+	builder := &noopBuilder{}
+	h.rng.Seed(239)
+	nmutations := int(h.rng.Int63() % int64(len(fs)))
+	b.ResetTimer()
 
-			for i := range b.N {
-				if i == 1000 {
-					v := h.rng.Int63()
-					if v != 7817861117094116717 {
-						b.Errorf("unexpected random value: %d. "+
-							"The bench should be deterministic for better comparison.", v)
-					}
-				}
-				_ = h.dp.PrintCountCycleProfile(builder, scaler, fs)
-				h.mutate(nmutations, fs)
+	for i := range b.N {
+		if i == 1000 {
+			v := h.rng.Int63()
+			if v != 7817861117094116717 {
+				b.Errorf("unexpected random value: %d. "+
+					"The bench should be deterministic for better comparison.", v)
 			}
-		})
+		}
+		_ = h.dp.PrintCountCycleProfile(builder, fs)
+		h.mutate(nmutations, fs)
 	}
 }
 
