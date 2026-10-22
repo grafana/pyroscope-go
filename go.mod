@@ -2,7 +2,7 @@ module github.com/grafana/pyroscope-go
 
 go 1.25.0
 
-toolchain go1.26.10
+toolchain go1.27.3
 
 replace github.com/grafana/pyroscope-go/godeltaprof => ./godeltaprof
 
