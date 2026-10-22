@@ -6,7 +6,7 @@ replace github.com/grafana/pyroscope-go => ../../
 
 require (
 	github.com/grafana/pyroscope-go v1.4.3
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0
 	google.golang.org/grpc v1.83.2
