@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -161,4 +162,20 @@ func newJob(name string) *upstream.UploadJob {
 	return &upstream.UploadJob{
 		Name: name,
 	}
+}
+
+func TestDefaultClientUsesProxyFromEnvironment(t *testing.T) {
+	r, err := NewRemote(Config{Address: "http://localhost:4040", Threads: 1})
+	require.NoError(t, err)
+
+	client, ok := r.client.(*http.Client)
+	require.True(t, ok, "default client should be *http.Client")
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok, "default transport should be *http.Transport")
+
+	require.NotNil(t, transport.Proxy, "default transport should honor proxy environment variables")
+	assert.Equal(t,
+		reflect.ValueOf(http.ProxyFromEnvironment).Pointer(),
+		reflect.ValueOf(transport.Proxy).Pointer(),
+	)
 }
