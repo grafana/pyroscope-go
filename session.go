@@ -142,7 +142,9 @@ func (ps *Session) takeSnapshots() {
 
 		case f := <-ps.flushCh:
 			ps.reset(ps.startTime, ps.truncatedTime())
-			_ = ps.cpu.Flush()
+			if ps.isCPUEnabled() {
+				_ = ps.cpu.Flush()
+			}
 			ps.upstream.Flush()
 			f.wg.Done()
 
