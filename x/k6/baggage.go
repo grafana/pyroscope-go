@@ -99,13 +99,8 @@ func (lh *labelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func setBaggageContextFromHeader(r *http.Request) (*http.Request, bool) {
-	baggageHeader := r.Header.Get("Baggage")
-	if baggageHeader == "" {
-		return r, false
-	}
-
-	b, err := baggage.Parse(baggageHeader)
-	if err != nil {
+	b, ok := parseBaggageHeaderValues(r.Header.Values("Baggage"))
+	if !ok {
 		return r, false
 	}
 
@@ -119,18 +114,27 @@ func setBaggageContextFromMetadata(ctx context.Context) (context.Context, bool) 
 		return ctx, false
 	}
 
-	baggageHeader := md.Get("Baggage")
-	if baggageHeader == nil || len(baggageHeader) == 0 {
-		return ctx, false
-	}
-
-	b, err := baggage.Parse(baggageHeader[0])
-	if err != nil {
+	b, ok := parseBaggageHeaderValues(md.Get("Baggage"))
+	if !ok {
 		return ctx, false
 	}
 
 	ctx = baggage.ContextWithBaggage(ctx, b)
 	return ctx, true
+}
+
+func parseBaggageHeaderValues(values []string) (baggage.Baggage, bool) {
+	var nonEmpty []string
+	for _, value := range values {
+		if strings.Trim(value, " \t") != "" {
+			nonEmpty = append(nonEmpty, value)
+		}
+	}
+
+	// Repeated baggage fields form one list, with shared parsing limits.
+	b, err := baggage.Parse(strings.Join(nonEmpty, ","))
+
+	return b, err == nil && b.Len() > 0
 }
 
 // getBaggageLabels applies filters and transformations to request baggage and
