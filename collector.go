@@ -105,9 +105,9 @@ func (c *cpuProfileCollector) Start() {
 					// Ticker fired after the StartCPUProfile
 					// call, that interrupted background
 					// profiling.
-					d = c.dur
+					d = 0
 				}
-				t.Reset(d)
+				t.Reset(c.dur - d)
 
 				continue
 			}
