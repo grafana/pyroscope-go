@@ -75,6 +75,8 @@ func NewRemote(cfg Config) (*Remote, error) {
 		jobs: make(chan job, 20),
 		client: &http.Client{
 			Transport: &http.Transport{
+				// Honor HTTPS_PROXY, HTTP_PROXY and NO_PROXY like http.DefaultTransport does.
+				Proxy:           http.ProxyFromEnvironment,
 				MaxConnsPerHost: cfg.Threads,
 			},
 			// Don't follow redirects
