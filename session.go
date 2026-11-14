@@ -20,6 +20,7 @@ type Session struct {
 	profileTypes  []ProfileType
 	uploadRate    time.Duration
 	disableGCRuns bool
+	heapTypes     map[string]*upstream.SampleType
 	// Deprecated: the field will be removed in future releases.
 	DisableAutomaticResets bool
 
@@ -111,6 +112,7 @@ func NewSession(c SessionConfig) (*Session, error) {
 		upstream:         c.Upstream,
 		appNames:         appNames,
 		profileTypes:     c.ProfilingTypes,
+		heapTypes:        selectHeapSampleTypes(c.ProfilingTypes),
 		disableGCRuns:    c.DisableGCRuns,
 		uploadRate:       c.UploadRate,
 		stopCh:           make(chan struct{}),
@@ -342,6 +344,12 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 			return
 		}
 		curMemBytes := copyBuf(ps.memBuf.Bytes())
+		curMemBytes, err = filterHeapSampleTypes(curMemBytes, ps.heapTypes)
+		if err != nil {
+			ps.logger.Errorf("failed to select heap profile sample types: %s", err)
+
+			return
+		}
 		job := &upstream.UploadJob{
 			Name:             ps.appNames.Godeltaprof,
 			StartTime:        startTime,
@@ -350,7 +358,7 @@ func (ps *Session) dumpHeapProfile(startTime time.Time, endTime time.Time) {
 			SampleRate:       100,
 			Format:           upstream.FormatPprof,
 			Profile:          curMemBytes,
-			SampleTypeConfig: sampleTypeConfigHeap,
+			SampleTypeConfig: ps.heapTypes,
 		}
 		ps.upstream.Upload(job)
 		ps.lastGCGeneration = currentGCGeneration
