@@ -9,9 +9,8 @@ import "unsafe"
 // A profMap is a map from (stack, tag) to mapEntry.
 // It grows without bound, but that's assumed to be OK.
 type profMap[PREV any, ACC any] struct {
-	hash    map[uintptr]*profMapEntry[PREV, ACC]
-	free    []profMapEntry[PREV, ACC]
-	freeStk []uintptr
+	hash map[uintptr]*profMapEntry[PREV, ACC]
+	free []profMapEntry[PREV, ACC]
 }
 
 // A profMapEntry is a single entry in the profMap.
@@ -24,6 +23,13 @@ type profMapEntry[PREV any, ACC any] struct {
 	acc      ACC
 }
 
+// Lookup returns the entry for (stk, tag), adding one if there is none.
+//
+// A new entry keeps stk itself, not a copy, so stk must stay unmodified for
+// as long as the map is in use. The stack of a runtime profile record is a
+// slice of the runtime's profile bucket, which the runtime neither modifies
+// nor frees, and the runtime holds one bucket for every stack it has
+// profiled: a copy here would double that memory.
 func (m *profMap[PREV, ACC]) Lookup(stk []uintptr, tag uintptr) *profMapEntry[PREV, ACC] {
 	// Compute hash of (stk, tag).
 	h := uintptr(0)
@@ -64,15 +70,7 @@ Search:
 	m.free = m.free[1:]
 	e.nextHash = m.hash[h]
 	e.tag = tag
-
-	if len(m.freeStk) < len(stk) {
-		m.freeStk = make([]uintptr, 1024)
-	}
-	// Limit cap to prevent append from clobbering freeStk.
-	e.stk = m.freeStk[:len(stk):len(stk)]
-	m.freeStk = m.freeStk[len(stk):]
-
-	copy(e.stk, stk)
+	e.stk = stk
 	if m.hash == nil {
 		m.hash = make(map[uintptr]*profMapEntry[PREV, ACC])
 	}
